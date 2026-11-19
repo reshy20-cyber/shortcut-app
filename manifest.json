@@ -1,0 +1,16 @@
+{
+  "name": "أقصر طريق | Shortcut",
+  "short_name": "أقصر طريق",
+  "description": "خريطة مدمجة وبوابات موثقة للوصول إلى المستشفيات والجامعات",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#f8fafc",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
