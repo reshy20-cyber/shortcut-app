@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/svg+xml" href="icon.svg" />
   <link rel="apple-touch-icon" href="icon.svg" />
-  <title>أقصر طريق | Shortcut v5</title>
+  <title>أقصر طريق | Shortcut v6</title>
   <style>
     :root {
       --bg: #f8fafc;
@@ -173,7 +173,7 @@
   <section class="search-card">
     <div class="input-row">
       <span class="dot start"></span>
-      <input type="text" id="startInput" placeholder="نقطة الانطلاق (أو اضغط على الخريطة)" oninput="handleSearch('start', this.value)" onfocus="handleSearch('start', this.value)" />
+      <input type="text" id="startInput" placeholder="نقطة الانطلاق (أو اضغط على الخريطة)" oninput="handleSearch('start', this.value)" onfocus="handleSearch('start', this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerQuickSearch('start', this.value);}" />
       <button class="mini-action" onclick="setPickTarget('start')" title="تحديد الانطلاق بالنقر على الخريطة">خريطة</button>
       <button class="mini-action" onclick="useMyLocation(false)">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>
@@ -184,7 +184,7 @@
 
     <div class="input-row" style="margin-bottom: 6px;">
       <span class="dot end"></span>
-      <input type="text" id="endInput" placeholder="ابحث عن مستشفى، جامعة، بوابة أو عنوان..." oninput="handleSearch('end', this.value)" onfocus="handleSearch('end', this.value)" />
+      <input type="text" id="endInput" placeholder="ابحث عن مستشفى، جامعة، بوابة أو عنوان..." oninput="handleSearch('end', this.value)" onfocus="handleSearch('end', this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerQuickSearch('end', this.value);}" />
       <button class="mini-action green" onclick="openModal('gatesModal')">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
         البوابات
@@ -323,8 +323,9 @@
       يتصل التطبيق مباشرة بخوادم <strong>Overpass API</strong> لاستخراج المستشفيات والجامعات وبواباتها ومواقف السيارات المحيطة وتحويلها تلقائياً إلى <strong>JSON Schema v1.0</strong>.
     </p>
     <div class="btn-row">
-      <button class="btn primary" onclick="fetchFromOverpass('viewport')">استكشاف نطاق الخريطة الحالي</button>
-      <button class="btn" onclick="fetchFromOverpass('cairo')">القاهرة (مدينة نصر)</button>
+      <button class="btn primary" onclick="fetchFromOverpass('viewport')">استكشاف حول موقعي / الخريطة (3.5 كم)</button>
+      <button class="btn" onclick="fetchFromOverpass('london')">لندن</button>
+      <button class="btn" onclick="fetchFromOverpass('cairo')">القاهرة</button>
       <button class="btn" onclick="fetchFromOverpass('riyadh')">الرياض</button>
     </div>
     <div id="osmStatus" style="margin-top:10px; font-size:12px; font-weight:700; color:var(--primary);"></div>
@@ -1393,95 +1394,181 @@
     setEndPoint({ lat: pendingPinCoords.lat, lng: pendingPinCoords.lng, label: `${facName} (${gateName})`, gate: newGate, facility: newFac });
   }
 
-  // Overpass API Real Data Importer
+  // Quick Enter Search (picks local match or first Nominatim result immediately)
+  async function triggerQuickSearch(target, query) {
+    const q = (query || "").trim();
+    if (!q) return;
+    const dd = document.getElementById(target + "Dropdown");
+    const firstDrop = dd.querySelector(".drop-item");
+    if (firstDrop) {
+      firstDrop.click();
+      return;
+    }
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`, {
+        headers: { "Accept-Language": "ar,en" }
+      });
+      const items = await res.json();
+      if (items && items[0]) {
+        dd.classList.remove("open");
+        const pt = { lat: parseFloat(items[0].lat), lng: parseFloat(items[0].lon), label: items[0].display_name.split(",")[0] };
+        target === "start" ? setStartPoint(pt) : setEndPoint(pt);
+        mapState.centerLat = pt.lat;
+        mapState.centerLng = pt.lng;
+        renderMap();
+      }
+    } catch (e) {}
+  }
+
+  // Multi-Mirror Overpass API + Nominatim Fallback Real Data Importer
   async function fetchFromOverpass(preset) {
     const status = document.getElementById("osmStatus");
+    status.style.color = "var(--primary)";
     status.textContent = "جاري الاتصال بخوادم OpenStreetMap وجلب المنشآت والبوابات...";
 
-    let bbox;
-    if (preset === "cairo") bbox = "30.045,31.310,30.075,31.355";
-    else if (preset === "riyadh") bbox = "24.690,46.660,24.740,46.720";
-    else {
-      const wrap = document.getElementById("mapWrap");
-      const tl = screenToLatLng(0, 0);
-      const br = screenToLatLng(wrap.clientWidth, wrap.clientHeight);
-      bbox = `${br.lat.toFixed(4)},${tl.lng.toFixed(4)},${tl.lat.toFixed(4)},${br.lng.toFixed(4)}`;
-    }
+    let cLat = mapState.centerLat;
+    let cLng = mapState.centerLng;
+    if (preset === "cairo") { cLat = 30.0605; cLng = 31.3300; }
+    else if (preset === "riyadh") { cLat = 24.7136; cLng = 46.6753; }
+    else if (preset === "london") { cLat = 51.5007; cLng = -0.1180; }
 
-    const query = `[out:json][timeout:15];(node["amenity"~"hospital|university"](${bbox});way["amenity"~"hospital|university"](${bbox});node["entrance"](${bbox});node["barrier"="gate"](${bbox});node["amenity"="parking"](${bbox}););out center 60;`;
+    // Always search a generous ~3.5 km radius around center so facilities are guaranteed to be found
+    const padLat = 0.032;
+    const padLng = 0.045;
+    const south = (cLat - padLat).toFixed(4);
+    const west = (cLng - padLng).toFixed(4);
+    const north = (cLat + padLat).toFixed(4);
+    const east = (cLng + padLng).toFixed(4);
+    const bbox = `${south},${west},${north},${east}`;
 
-    try {
-      const res = await fetch("https://overpass-api.de/api/interpreter", {
-        method: "POST",
-        body: "data=" + encodeURIComponent(query)
-      });
-      const data = await res.json();
-      const elements = data.elements || [];
+    const query = `[out:json][timeout:12];(node["amenity"~"hospital|university|clinic"](${bbox});way["amenity"~"hospital|university|clinic"](${bbox});node["entrance"](${bbox});node["barrier"="gate"](${bbox});node["amenity"="parking"](${bbox}););out center 80;`;
 
-      const amenities = elements.filter(e => e.tags && (e.tags.amenity === "hospital" || e.tags.amenity === "university"));
-      const gates = elements.filter(e => e.tags && (e.tags.entrance || e.tags.barrier === "gate"));
-      const parkings = elements.filter(e => e.tags && e.tags.amenity === "parking");
+    const mirrors = [
+      "https://overpass-api.de/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter",
+      "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+    ];
 
-      let added = 0;
-      amenities.forEach(am => {
-        const c = am.center || { lat: am.lat, lon: am.lon };
-        if (!c.lat) return;
-        const nameAr = am.tags["name:ar"] || am.tags.name || (am.tags.amenity === "hospital" ? "مستشفى (OSM)" : "جامعة (OSM)");
-        const nearbyGates = gates.filter(g => haversineKm({ lat: c.lat, lng: c.lon }, { lat: g.lat, lng: g.lon }) < 0.35);
-        const nearbyPark = parkings.find(p => haversineKm({ lat: c.lat, lng: c.lon }, { lat: p.lat, lng: p.lon }) < 0.45);
-
-        const parkObj = nearbyPark ? [{
-          id: "park_osm_" + nearbyPark.id,
-          name: { ar: nearbyPark.tags?.name || "موقف سيارات مجاور (OSM)", en: "Nearby OSM Parking" },
-          entrance_coords: { lat: nearbyPark.lat, lng: nearbyPark.lon },
-          walking_to_gate_meters: Math.round(haversineKm({ lat: c.lat, lng: c.lon }, { lat: nearbyPark.lat, lng: nearbyPark.lon }) * 1000) || 80,
-          walking_time_seconds: 70,
-          accessible_spots: true
-        }] : [];
-
-        const gateObjs = nearbyGates.length ? nearbyGates.slice(0, 3).map((g, i) => ({
-          id: "gate_osm_" + g.id,
-          type: "osm_entrance",
-          is_public: g.tags.access !== "private" && g.tags.access !== "no",
-          name: { ar: g.tags["name:ar"] || g.tags.name || `بوابة / مدخل رقم ${i + 1}`, en: g.tags.name || `Entrance ${i + 1}` },
-          coords: { lat: g.lat, lng: g.lon },
-          linked_parking_ids: parkObj.length ? [parkObj[0].id] : [],
-          accessibility: { wheelchair: g.tags.wheelchair || "full", elderly_friendly: g.tags.wheelchair !== "no", has_ramp: g.tags.wheelchair === "yes", stairs_count: 0 },
-          guidance_note: { ar: "مستورد تلقائياً من OpenStreetMap ومربوط بأقرب موقف.", en: "Imported from OSM." }
-        })) : [{
-          id: "gate_osm_center_" + am.id,
-          type: "main_entrance",
-          is_public: true,
-          name: { ar: "المدخل الرئيسي للمنشأة", en: "Main Entrance" },
-          coords: { lat: c.lat, lng: c.lon },
-          linked_parking_ids: parkObj.length ? [parkObj[0].id] : [],
-          accessibility: { wheelchair: am.tags.wheelchair || "full", elderly_friendly: true, has_ramp: true, stairs_count: 0 },
-          guidance_note: { ar: "منشأة مستوردة من OpenStreetMap.", en: "OSM Facility." }
-        }];
-
-        if (!schemaData.facilities.some(f => f.id === "fac_osm_" + am.id)) {
-          schemaData.facilities.unshift({
-            id: "fac_osm_" + am.id,
-            osm_id: `${am.type}/${am.id}`,
-            category: am.tags.amenity,
-            name: { ar: nameAr, en: am.tags["name:en"] || nameAr },
-            aliases: { ar: [nameAr], en: [] },
-            center_coords: { lat: c.lat, lng: c.lon },
-            gates: gateObjs,
-            parkings: parkObj
-          });
-          added++;
+    let elements = null;
+    for (let i = 0; i < mirrors.length; i++) {
+      try {
+        status.textContent = `جاري الاتصال بالخادم (${i + 1}/${mirrors.length})...`;
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 9000);
+        const res = await fetch(mirrors[i], {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+          body: "data=" + encodeURIComponent(query),
+          signal: controller.signal
+        });
+        clearTimeout(tid);
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (data && Array.isArray(data.elements)) {
+          elements = data.elements;
+          break;
         }
-      });
-
-      localStorage.setItem("shortcut_schema_v1", JSON.stringify(schemaData));
-      renderMap();
-      status.textContent = added > 0
-        ? `✓ تم استيراد ودمج ${added} منشأة ببواباتها ومواقفها بنجاح!`
-        : "لم يتم العثور على منشآت جديدة في هذا النطاق، حرّك الخريطة أو اختر مدينة.";
-    } catch (e) {
-      status.textContent = "تعذر الاتصال بخادم Overpass حالياً (تأكد من الاتصال بالإنترنت).";
+      } catch (e) {}
     }
+
+    // Fallback to Nominatim Bounded Search if all Overpass mirrors are busy
+    if (!elements) {
+      try {
+        status.textContent = "خوادم Overpass مزدحمة — جاري الجلب عبر خادم البحث البديل (Nominatim)...";
+        const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=25&bounded=1&viewbox=${west},${north},${east},${south}&q=hospital+OR+university`;
+        const res = await fetch(nomUrl, { headers: { "Accept-Language": "ar,en" } });
+        const list = await res.json();
+        if (Array.isArray(list) && list.length) {
+          elements = list.map((it, idx) => ({
+            type: "node",
+            id: Number(it.osm_id) || (900000 + idx),
+            lat: parseFloat(it.lat),
+            lon: parseFloat(it.lon),
+            tags: {
+              amenity: (it.type === "university" || (it.display_name || "").toLowerCase().includes("university")) ? "university" : "hospital",
+              name: it.display_name.split(",")[0]
+            }
+          }));
+        }
+      } catch (e) {}
+    }
+
+    if (!elements || !elements.length) {
+      status.style.color = "var(--danger)";
+      status.textContent = "تعذر الحصول على استجابة من الخوادم حالياً، حاول مرة أخرى بعد قليل أو ثبّت البوابة يدوياً على الخريطة.";
+      return;
+    }
+
+    const amenities = elements.filter(e => e.tags && ["hospital", "university", "clinic"].includes(e.tags.amenity));
+    const gates = elements.filter(e => e.tags && (e.tags.entrance || e.tags.barrier === "gate"));
+    const parkings = elements.filter(e => e.tags && e.tags.amenity === "parking");
+
+    let added = 0;
+    let firstCoords = null;
+
+    amenities.forEach(am => {
+      const c = am.center || { lat: am.lat, lon: am.lon };
+      if (!c.lat) return;
+      if (!firstCoords) firstCoords = { lat: c.lat, lng: c.lon };
+      const nameAr = am.tags["name:ar"] || am.tags.name || (am.tags.amenity === "hospital" ? "مستشفى (OSM)" : "جامعة (OSM)");
+      const nearbyGates = gates.filter(g => haversineKm({ lat: c.lat, lng: c.lon }, { lat: g.lat, lng: g.lon }) < 0.45);
+      const nearbyPark = parkings.find(p => haversineKm({ lat: c.lat, lng: c.lon }, { lat: p.lat, lng: p.lon }) < 0.55);
+
+      const parkObj = nearbyPark ? [{
+        id: "park_osm_" + nearbyPark.id,
+        name: { ar: nearbyPark.tags?.name || "موقف سيارات مجاور (OSM)", en: "Nearby OSM Parking" },
+        entrance_coords: { lat: nearbyPark.lat, lng: nearbyPark.lon },
+        walking_to_gate_meters: Math.round(haversineKm({ lat: c.lat, lng: c.lon }, { lat: nearbyPark.lat, lng: nearbyPark.lon }) * 1000) || 80,
+        walking_time_seconds: 70,
+        accessible_spots: true
+      }] : [];
+
+      const gateObjs = nearbyGates.length ? nearbyGates.slice(0, 3).map((g, i) => ({
+        id: "gate_osm_" + g.id,
+        type: "osm_entrance",
+        is_public: g.tags.access !== "private" && g.tags.access !== "no",
+        name: { ar: g.tags["name:ar"] || g.tags.name || `بوابة / مدخل رقم ${i + 1}`, en: g.tags.name || `Entrance ${i + 1}` },
+        coords: { lat: g.lat, lng: g.lon },
+        linked_parking_ids: parkObj.length ? [parkObj[0].id] : [],
+        accessibility: { wheelchair: g.tags.wheelchair || "full", elderly_friendly: g.tags.wheelchair !== "no", has_ramp: g.tags.wheelchair === "yes", stairs_count: 0 },
+        guidance_note: { ar: "مستورد تلقائياً من OpenStreetMap ومربوط بأقرب موقف.", en: "Imported from OSM." }
+      })) : [{
+        id: "gate_osm_center_" + am.id,
+        type: "main_entrance",
+        is_public: true,
+        name: { ar: "المدخل الرئيسي للمنشأة", en: "Main Entrance" },
+        coords: { lat: c.lat, lng: c.lon },
+        linked_parking_ids: parkObj.length ? [parkObj[0].id] : [],
+        accessibility: { wheelchair: am.tags.wheelchair || "full", elderly_friendly: true, has_ramp: true, stairs_count: 0 },
+        guidance_note: { ar: "منشأة مستوردة من OpenStreetMap.", en: "OSM Facility." }
+      }];
+
+      if (!schemaData.facilities.some(f => f.id === "fac_osm_" + am.id)) {
+        schemaData.facilities.unshift({
+          id: "fac_osm_" + am.id,
+          osm_id: `${am.type}/${am.id}`,
+          category: am.tags.amenity,
+          name: { ar: nameAr, en: am.tags["name:en"] || nameAr },
+          aliases: { ar: [nameAr], en: [] },
+          center_coords: { lat: c.lat, lng: c.lon },
+          gates: gateObjs,
+          parkings: parkObj
+        });
+        added++;
+      }
+    });
+
+    localStorage.setItem("shortcut_schema_v1", JSON.stringify(schemaData));
+    if (firstCoords) {
+      mapState.centerLat = firstCoords.lat;
+      mapState.centerLng = firstCoords.lng;
+      mapState.zoom = 13.8;
+    }
+    renderMap();
+    status.style.color = "var(--emerald)";
+    status.textContent = added > 0
+      ? `✓ تم استيراد ودمج ${added} منشأة ببواباتها ومواقفها في هذا النطاق بنجاح!`
+      : "جميع منشآت هذا النطاق (3.5 كم) مضافة بالفعل في قائمة «البوابات»!";
   }
 
   // Modals & Schema Export/Import
