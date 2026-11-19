@@ -67,11 +67,11 @@
     .zoom-btn.loc { color: var(--primary); }
 
     /* اللوحة السفلية */
-    .sheet { position: fixed; right: 0; left: 0; bottom: 0; z-index: 950; max-width: 560px; margin: 0 auto; background: #fff; border-radius: 24px 24px 0 0; box-shadow: 0 -8px 30px rgba(15,23,42,0.18); max-height: 52vh; display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
+    .sheet { position: fixed; right: 0; left: 0; bottom: 0; z-index: 950; max-width: 560px; margin: 0 auto; background: #fff; border-radius: 24px 24px 0 0; box-shadow: 0 -8px 30px rgba(15,23,42,0.18); max-height: 58vh; max-height: 58dvh; display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
     .sheet-handle { border: none; background: transparent; width: 100%; padding: 8px 16px 8px; cursor: pointer; flex-shrink: 0; text-align: center; min-height: 52px; }
     .sheet-handle::before { content: ""; display: block; width: 44px; height: 5px; border-radius: 3px; background: #cbd5e1; margin: 0 auto 7px; }
     .sheet-summary { font-size: 14px; font-weight: 800; color: var(--text); }
-    .sheet-body { overflow-y: auto; padding: 0 12px 14px; flex: 1; }
+    .sheet-body { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 12px calc(110px + env(safe-area-inset-bottom)); flex: 1; }
     .sheet.collapsed .sheet-body { display: none; }
     .sheet-sub { font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 2px; }
     .sheet-actions { padding: 0 12px 10px; flex-shrink: 0; }
