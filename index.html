@@ -576,6 +576,7 @@
     if (!w || !h) return;
 
     hitTargets = [];
+    const placedLabels = [];
 
     // 1. Base land background
     ctx.fillStyle = "#eef2f6";
@@ -734,11 +735,17 @@
         const label = g.name.ar;
         ctx.font = "bold 10px sans-serif";
         const tw = ctx.measureText(label).width + 12;
-        ctx.fillStyle = "rgba(255,255,255,0.92)";
-        drawRoundedRect(s.x - tw / 2, s.y + 13, tw, 17, 6);
-        ctx.fillStyle = isClosed ? "#b91c1c" : "#065f46";
-        ctx.textAlign = "center";
-        ctx.fillText(label, s.x, s.y + 24.5);
+        // لا نرسم التسمية إذا تراكبت مع تسمية سابقة (يبقى الدبوس قابلاً للضغط)
+        const box = { x1: s.x - tw / 2, x2: s.x + tw / 2, y1: s.y + 13, y2: s.y + 30 };
+        const overlaps = placedLabels.some(b => box.x1 < b.x2 && box.x2 > b.x1 && box.y1 < b.y2 && box.y2 > b.y1);
+        if (!overlaps) {
+          placedLabels.push(box);
+          ctx.fillStyle = "rgba(255,255,255,0.92)";
+          drawRoundedRect(box.x1, box.y1, tw, 17, 6);
+          ctx.fillStyle = isClosed ? "#b91c1c" : "#065f46";
+          ctx.textAlign = "center";
+          ctx.fillText(label, s.x, s.y + 24.5);
+        }
 
         hitTargets.push({
           x: s.x,
