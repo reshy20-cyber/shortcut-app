@@ -1,6 +1,6 @@
 // Service worker: يخزّن ملفات التطبيق فقط ليعمل بدون إنترنت.
 // لا يخزّن صور الخريطة ولا ردود الخوادم (بحث/مسارات) لأنها تتغير وتخضع لسياسات الاستخدام.
-const CACHE = "shortcut-shell-v3";
+const CACHE = "shortcut-shell-v4";
 const SHELL = ["./", "./index.html", "./manifest.json", "./icon.svg", "./config.js"];
 
 self.addEventListener("install", (e) => {
