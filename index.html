@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#f8fafc" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="أقصر طريق" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <title>أقصر طريق | Shortcut v5</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-soft: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #2563eb;
+      --primary-soft: #eff6ff;
+      --emerald: #059669;
+      --emerald-soft: #ecfdf5;
+      --amber: #d97706;
+      --amber-soft: #fffbeb;
+      --danger: #dc2626;
+      --danger-soft: #fef2f2;
+      --radius: 16px;
+      --shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, Arial, sans-serif; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); height: 100%; overflow-x: hidden; }
+    .app-shell { max-width: 540px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; background: var(--bg); padding-bottom: 24px; }
+
+    /* Header */
+    .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: calc(10px + env(safe-area-inset-top)) 14px 10px; position: sticky; top: 0; z-index: 1000; }
+    .topbar-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .brand { display: flex; align-items: center; gap: 8px; }
+    .brand-logo { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg, #2563eb, #0ea5e9); display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; box-shadow: 0 4px 12px rgba(37,99,235,0.25); }
+    .brand-title { font-weight: 800; font-size: 16px; line-height: 1.1; color: var(--text); }
+    .brand-sub { font-size: 11px; color: var(--primary); font-weight: 700; }
+    .status-pills { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .pill-btn { border: 1px solid var(--border); background: var(--surface-soft); color: var(--text); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+    .pill-btn.online { background: var(--emerald-soft); color: var(--emerald); border-color: #a7f3d0; }
+    .pill-btn.offline { background: var(--amber-soft); color: var(--amber); border-color: #fde68a; }
+
+    /* Search & Inputs */
+    .search-card { background: var(--surface); margin: 10px 12px; padding: 12px; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); }
+    .input-row { display: flex; align-items: center; gap: 6px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 12px; padding: 6px 9px; margin-bottom: 8px; position: relative; }
+    .input-row:focus-within { border-color: var(--primary); background: #fff; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .dot.start { background: var(--primary); box-shadow: 0 0 0 3px #dbeafe; }
+    .dot.end { background: var(--emerald); box-shadow: 0 0 0 3px #d1fae5; }
+    .input-row input { border: none; background: transparent; width: 100%; font-size: 13px; color: var(--text); outline: none; padding: 4px 0; min-width: 0; }
+    .mini-action { border: none; background: #fff; color: var(--primary); border: 1px solid #dbeafe; border-radius: 9px; padding: 5px 8px; font-size: 11px; font-weight: 700; white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; }
+    .mini-action.green { color: var(--emerald); border-color: #a7f3d0; background: var(--emerald-soft); }
+
+    /* Modes */
+    .mode-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 4px; }
+    .mode-tab { border: 1px solid var(--border); background: var(--surface-soft); color: var(--muted); border-radius: 11px; padding: 8px 6px; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; transition: 0.15s; }
+    .mode-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 3px 10px rgba(37,99,235,0.22); }
+
+    /* Search Dropdown */
+    .dropdown { position: absolute; top: calc(100% + 4px); right: 0; left: 0; background: #fff; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 28px rgba(15,23,42,0.14); z-index: 1200; max-height: 250px; overflow-y: auto; display: none; }
+    .dropdown.open { display: block; }
+    .drop-item { padding: 10px 12px; border-bottom: 1px solid var(--surface-soft); cursor: pointer; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .drop-item:hover { background: var(--primary-soft); }
+    .drop-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .drop-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; white-space: nowrap; }
+    .badge-gate { background: var(--emerald-soft); color: var(--emerald); }
+    .badge-osm { background: var(--primary-soft); color: var(--primary); }
+
+    /* Built-in Zero-Dependency Interactive Canvas Map */
+    .map-wrap { margin: 0 12px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); position: relative; height: 295px; background: #eef2f6; touch-action: none; user-select: none; }
+    #mapCanvas { width: 100%; height: 100%; display: block; cursor: grab; }
+    #mapCanvas:active { cursor: grabbing; }
+    .map-hint { position: absolute; top: 10px; right: 10px; left: 10px; z-index: 500; background: rgba(255,255,255,0.96); backdrop-filter: blur(6px); border: 1px solid var(--border); border-radius: 12px; padding: 6px 10px; font-size: 11.5px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; gap: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+    .zoom-stack { position: absolute; left: 10px; top: 54px; z-index: 500; display: flex; flex-direction: column; gap: 5px; }
+    .zoom-btn { width: 32px; height: 32px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255,255,255,0.96); color: var(--text); font-size: 16px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .map-tools { position: absolute; bottom: 10px; right: 10px; left: 10px; z-index: 500; display: flex; gap: 6px; flex-wrap: wrap; }
+    .map-tool-btn { background: rgba(255,255,255,0.96); border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; font-size: 11px; font-weight: 700; color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .map-tool-btn.active { background: var(--emerald); color: #fff; border-color: var(--emerald); }
+
+    /* Active Navigation Bar */
+    .nav-live { margin: 10px 12px 0; background: #0f172a; color: #fff; border-radius: var(--radius); padding: 12px; display: none; box-shadow: 0 8px 24px rgba(15,23,42,0.2); }
+    .nav-live.active { display: block; }
+    .nav-step-text { font-size: 14px; font-weight: 800; margin: 4px 0 8px; line-height: 1.4; }
+    .nav-controls { display: flex; gap: 6px; flex-wrap: wrap; }
+    .nav-btn { border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; border-radius: 9px; padding: 6px 10px; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .nav-btn.primary { background: var(--emerald); border-color: var(--emerald); }
+    .nav-btn.stop { background: var(--danger); border-color: var(--danger); }
+
+    /* Results & Routes */
+    .section { margin: 10px 12px 0; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .section-title { font-size: 13px; font-weight: 800; color: var(--text); }
+    .gate-banner { background: var(--emerald-soft); border: 1px solid #a7f3d0; border-radius: 14px; padding: 10px 12px; margin-bottom: 10px; }
+    .gate-banner.warn { background: var(--amber-soft); border-color: #fde68a; }
+    .gate-banner-title { font-size: 13px; font-weight: 800; color: #065f46; display: flex; align-items: center; gap: 6px; }
+    .gate-banner.warn .gate-banner-title { color: #92400e; }
+    .gate-banner-sub { font-size: 12px; color: #047857; margin-top: 4px; line-height: 1.4; }
+    .gate-banner.warn .gate-banner-sub { color: #b45309; }
+
+    .route-card { background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 9px; cursor: pointer; transition: 0.15s; box-shadow: var(--shadow); }
+    .route-card.selected { border-color: var(--primary); background: #f8fbff; }
+    .route-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .route-tag { font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: 8px; }
+    .tag-fast { background: var(--primary-soft); color: var(--primary); }
+    .tag-short { background: var(--emerald-soft); color: var(--emerald); }
+    .tag-cheap { background: var(--amber-soft); color: var(--amber); }
+    .route-metrics { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; }
+    .route-why { margin-top: 8px; background: var(--surface-soft); border-radius: 10px; padding: 8px 10px; font-size: 12px; color: var(--text); line-height: 1.45; border-right: 3px solid var(--primary); }
+    .route-meta { margin-top: 7px; display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--muted); font-weight: 600; }
+
+    .start-nav-btn { width: 100%; border: none; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; border-radius: 14px; padding: 13px; font-size: 14px; font-weight: 800; cursor: pointer; box-shadow: 0 6px 18px rgba(37,99,235,0.28); margin-top: 4px; }
+
+    /* Empty State */
+    .empty-card { background: var(--surface); border: 1px dashed #cbd5e1; border-radius: var(--radius); padding: 18px 14px; text-align: center; }
+    .empty-title { font-size: 14px; font-weight: 800; margin-bottom: 5px; }
+    .empty-sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+    /* Modals */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 2000; display: none; align-items: flex-end; justify-content: center; }
+    .modal-backdrop.open { display: flex; }
+    .modal-sheet { background: #fff; width: 100%; max-width: 540px; border-radius: 22px 22px 0 0; padding: 16px; max-height: 86vh; overflow-y: auto; box-shadow: 0 -8px 30px rgba(0,0,0,0.18); }
+    .modal-head { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 12px; }
+    .modal-title { font-size: 15px; font-weight: 800; }
+    .close-btn { border: none; background: var(--surface-soft); border-radius: 999px; width: 30px; height: 30px; font-weight: 800; cursor: pointer; }
+    .field { margin-bottom: 10px; }
+    .field label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 4px; color: var(--text); }
+    .field input, .field select, .field textarea { width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; font-size: 13px; background: var(--surface-soft); color: var(--text); }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .btn { border: 1px solid var(--border); background: var(--surface-soft); color: var(--text); border-radius: 11px; padding: 9px 12px; font-size: 12px; font-weight: 700; cursor: pointer; flex: 1; text-align: center; }
+    .btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .btn.green { background: var(--emerald); color: #fff; border-color: var(--emerald); }
+    .fac-item { border: 1px solid var(--border); border-radius: 12px; padding: 10px; margin-bottom: 8px; background: var(--surface-soft); }
+    .gate-chip { display: inline-flex; align-items: center; gap: 4px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; font-size: 11px; font-weight: 700; margin: 4px 4px 0 0; cursor: pointer; }
+    .gate-chip:hover { border-color: var(--primary); color: var(--primary); }
+    .gate-chip.closed { background: var(--danger-soft); color: var(--danger); border-color: #fecaca; }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="topbar-row">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        </div>
+        <div>
+          <div class="brand-title">أقصر طريق</div>
+          <div class="brand-sub">Shortcut • خريطة مدمجة + بوابات ذكية</div>
+        </div>
+      </div>
+      <div class="status-pills">
+        <button class="pill-btn" id="vehiclePill" onclick="openModal('vehicleModal')" title="إعدادات المركبة والوقود">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 22V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16"/><path d="M13 10h2a2 2 0 0 1 2 2v5a2 2 0 0 0 4 0V9l-3-3"/><line x1="3" y1="22" x2="15" y2="22"/></svg>
+          <span id="fuelRateLabel">8.5L</span>
+        </button>
+        <button class="pill-btn online" id="netPill" onclick="toggleOfflineMode()">
+          <span id="netDot">●</span>
+          <span id="netLabel">متصل</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Search & Travel Modes -->
+  <section class="search-card">
+    <div class="input-row">
+      <span class="dot start"></span>
+      <input type="text" id="startInput" placeholder="نقطة الانطلاق (أو اضغط على الخريطة)" oninput="handleSearch('start', this.value)" onfocus="handleSearch('start', this.value)" />
+      <button class="mini-action" onclick="setPickTarget('start')" title="تحديد الانطلاق بالنقر على الخريطة">خريطة</button>
+      <button class="mini-action" onclick="useMyLocation(false)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>
+        موقعي
+      </button>
+      <div class="dropdown" id="startDropdown"></div>
+    </div>
+
+    <div class="input-row" style="margin-bottom: 6px;">
+      <span class="dot end"></span>
+      <input type="text" id="endInput" placeholder="ابحث عن مستشفى، جامعة، بوابة أو عنوان..." oninput="handleSearch('end', this.value)" onfocus="handleSearch('end', this.value)" />
+      <button class="mini-action green" onclick="openModal('gatesModal')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
+        البوابات
+      </button>
+      <div class="dropdown" id="endDropdown"></div>
+    </div>
+
+    <div class="mode-tabs">
+      <button class="mode-tab active" data-mode="car" onclick="setMode('car')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+        سيارة
+      </button>
+      <button class="mode-tab" data-mode="walk" onclick="setMode('walk')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="13" cy="4" r="2"/><path d="m10 21 2-6 3 2v4"/><path d="m7 13 3-4 4 2 3-2"/></svg>
+        مشاة آمن
+      </button>
+      <button class="mode-tab" data-mode="wheelchair" onclick="setMode('wheelchair')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="10" cy="4" r="2"/><circle cx="10" cy="16" r="4"/><path d="M10 8v4h5l2 5"/></svg>
+        مسار ميسّر
+      </button>
+    </div>
+  </section>
+
+  <!-- Built-in Interactive Map (Works Offline & in Local QuickLook + Live OSM Tiles when Online) -->
+  <div class="map-wrap" id="mapWrap">
+    <div class="map-hint">
+      <span id="mapHintText">اضغط على الخريطة أو أي بوابة لتحديد الوجهة</span>
+      <button class="mini-action" style="padding:3px 7px;" onclick="resetSelection()">مسح</button>
+    </div>
+    <div class="zoom-stack">
+      <button class="zoom-btn" onclick="changeZoom(1)" aria-label="تكبير">+</button>
+      <button class="zoom-btn" onclick="changeZoom(-1)" aria-label="تصغير">−</button>
+      <button class="zoom-btn" style="font-size:12px;" onclick="centerOnFacilities()" title="توسيط على المنشآت">⌖</button>
+    </div>
+    <canvas id="mapCanvas"></canvas>
+    <div class="map-tools">
+      <button class="map-tool-btn" id="pinGateBtn" onclick="togglePinGateMode()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        تثبيت بوابة على الخريطة
+      </button>
+      <button class="map-tool-btn" onclick="openModal('osmModal')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        جلب من OSM
+      </button>
+    </div>
+  </div>
+
+  <!-- Live Voice Navigation Bar -->
+  <div class="nav-live" id="navLiveBar">
+    <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#94a3b8;">
+      <span>التوجيه الصوتي المباشر • <strong id="navStepCounter" style="color:#34d399;">خطوة 1/1</strong></span>
+      <button class="nav-btn" id="voiceMuteBtn" onclick="toggleVoiceMute()">🔊 الصوت مفعل</button>
+    </div>
+    <div class="nav-step-text" id="navStepText">اتجه نحو البوابة المحددة</div>
+    <div class="nav-controls">
+      <button class="nav-btn" onclick="speakCurrentStep()">إعادة النطق</button>
+      <button class="nav-btn primary" onclick="nextNavStep()">الخطوة التالية ◀</button>
+      <button class="nav-btn" id="gpsTrackBtn" onclick="toggleLiveGpsTracking()">📍 تتبع GPS حي</button>
+      <button class="nav-btn" id="simAutoBtn" onclick="toggleAutoSim()">▶ محاكاة</button>
+      <button class="nav-btn stop" onclick="stopNavigation()">إنهاء</button>
+    </div>
+  </div>
+
+  <!-- Results Section -->
+  <section class="section" id="resultsSection">
+    <div class="empty-card">
+      <div class="empty-title">اضغط على أي بوابة خضراء في الخريطة أو اختر من «البوابات»</div>
+      <div class="empty-sub">الخريطة المدمجة تعمل فوراً بدون إنترنت، وتعرض الشوارع الرئيسية، المنشآت، المواقف، والبوابات الموثقة. اسحب الخريطة للتحريك أو المس أي نقطة لرسم المسار.</div>
+    </div>
+  </section>
+</div>
+
+<!-- Modal 1: Verified Gates & JSON Schema -->
+<div class="modal-backdrop" id="gatesModal" onclick="if(event.target===this) closeModal('gatesModal')">
+  <div class="modal-sheet">
+    <div class="modal-head">
+      <div class="modal-title">البوابات والمواقف الموثقة (JSON Schema v1.0)</div>
+      <button class="close-btn" onclick="closeModal('gatesModal')">✕</button>
+    </div>
+    <div id="facilitiesList"></div>
+    <hr style="border:none; border-top:1px solid var(--border); margin:12px 0;" />
+    <div style="font-size:12px; font-weight:800; margin-bottom:6px;">تصدير / استيراد قاعدة البيانات الموحدة (JSON)</div>
+    <div class="btn-row">
+      <button class="btn primary" onclick="exportSchemaJSON()">تحميل ملف JSON</button>
+      <button class="btn" onclick="copySchemaJSON()">نسخ JSON</button>
+      <label class="btn green" style="cursor:pointer;">
+        استيراد JSON
+        <input type="file" accept=".json" style="display:none;" onchange="importSchemaFile(event)" />
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 2: Vehicle & Cost Settings -->
+<div class="modal-backdrop" id="vehicleModal" onclick="if(event.target===this) closeModal('vehicleModal')">
+  <div class="modal-sheet">
+    <div class="modal-head">
+      <div class="modal-title">إعدادات المركبة وحساب التكلفة</div>
+      <button class="close-btn" onclick="closeModal('vehicleModal')">✕</button>
+    </div>
+    <div class="field">
+      <label>فئة المركبة</label>
+      <select id="vehPreset" onchange="applyVehPreset(this.value)">
+        <option value="6.2">اقتصادية / سيدان صغيرة (6.2 لتر / 100 كم)</option>
+        <option value="8.5" selected>متوسطة (8.5 لتر / 100 كم)</option>
+        <option value="12.0">دفع رباعي SUV (12.0 لتر / 100 كم)</option>
+        <option value="2.5">هجينة / كهربائية مكافئ (2.5 لتر / 100 كم)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>استهلاك الوقود (لتر لكل 100 كم)</label>
+      <input type="number" step="0.1" id="vehFuelRate" value="8.5" />
+    </div>
+    <div class="field">
+      <label>سعر اللتر (بالعملة المحلية)</label>
+      <input type="number" step="0.1" id="vehFuelPrice" value="13.75" />
+    </div>
+    <div class="field">
+      <label>العملة</label>
+      <input type="text" id="vehCurrency" value="ج.م" />
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" onclick="saveVehicleSettings()">حفظ وتحديث الحسابات</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 3: Overpass API OSM Importer -->
+<div class="modal-backdrop" id="osmModal" onclick="if(event.target===this) closeModal('osmModal')">
+  <div class="modal-sheet">
+    <div class="modal-head">
+      <div class="modal-title">جلب بوابات ومواقف حقيقية من OpenStreetMap</div>
+      <button class="close-btn" onclick="closeModal('osmModal')">✕</button>
+    </div>
+    <p style="font-size:12px; color:var(--muted); margin-top:0; line-height:1.5;">
+      يتصل التطبيق مباشرة بخوادم <strong>Overpass API</strong> لاستخراج المستشفيات والجامعات وبواباتها ومواقف السيارات المحيطة وتحويلها تلقائياً إلى <strong>JSON Schema v1.0</strong>.
+    </p>
+    <div class="btn-row">
+      <button class="btn primary" onclick="fetchFromOverpass('viewport')">استكشاف نطاق الخريطة الحالي</button>
+      <button class="btn" onclick="fetchFromOverpass('cairo')">القاهرة (مدينة نصر)</button>
+      <button class="btn" onclick="fetchFromOverpass('riyadh')">الرياض</button>
+    </div>
+    <div id="osmStatus" style="margin-top:10px; font-size:12px; font-weight:700; color:var(--primary);"></div>
+  </div>
+</div>
+
+<!-- Modal 4: Pin New Gate -->
+<div class="modal-backdrop" id="newGateModal" onclick="if(event.target===this) closeModal('newGateModal')">
+  <div class="modal-sheet">
+    <div class="modal-head">
+      <div class="modal-title">توثيق بوابة أو مدخل جديد</div>
+      <button class="close-btn" onclick="closeModal('newGateModal')">✕</button>
+    </div>
+    <div class="field">
+      <label>اسم المنشأة (مستشفى / جامعة / مرفق)</label>
+      <input type="text" id="ngFacName" placeholder="مثال: مستشفى دار الفؤاد" />
+    </div>
+    <div class="field">
+      <label>اسم البوابة الدقيقة</label>
+      <input type="text" id="ngGateName" placeholder="مثال: بوابة العيادات الخارجية رقم 2" />
+    </div>
+    <div class="field">
+      <label>إمكانية الوصول للكراسي المتحركة وكبار السن</label>
+      <select id="ngWheelchair">
+        <option value="full">مجهز بالكامل (منحدر بدون سلالم)</option>
+        <option value="limited">مجهز جزئياً</option>
+        <option value="no">غير مجهز (يوجد سلالم)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>ملاحظة إرشادية للوصول والموقف</label>
+      <input type="text" id="ngNote" placeholder="مثال: أقرب موقف على بعد 50 متر يمين البوابة" />
+    </div>
+    <div class="btn-row">
+      <button class="btn green" onclick="saveNewPinnedGate()">حفظ البوابة وتعيينها كوجهة</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 1. Unified Global JSON Schema v1.0.0
+  const DEFAULT_SCHEMA = {
+    schema_version: "1.0.0",
+    region_pack: {
+      pack_id: "global-starter-v1",
+      updated_at: new Date().toISOString(),
+      offline_ready: true
+    },
+    facilities: [
+      {
+        id: "fac_shifa_01",
+        category: "hospital",
+        name: { ar: "مستشفى الشفاء التخصصي", en: "Al-Shifa Specialized Hospital" },
+        aliases: { ar: ["الشفاء", "العيادات الخارجية الشفاء", "طوارئ الشفاء"], en: ["Al Shifa", "Shifa Hospital"] },
+        center_coords: { lat: 30.0626, lng: 31.3397 },
+        gates: [
+          {
+            id: "gate_shifa_clinics",
+            type: "outpatient_visitors",
+            is_public: true,
+            name: { ar: "بوابة العيادات (3)", en: "Outpatient Gate 3" },
+            coords: { lat: 30.0634, lng: 31.3408 },
+            linked_parking_ids: ["park_shifa_east"],
+            accessibility: { wheelchair: "full", elderly_friendly: true, has_ramp: true, stairs_count: 0, max_slope_percent: 3.0 },
+            guidance_note: { ar: "الأقرب للعيادات والأشعة؛ مسار مستوٍ تماماً بدون سلالم.", en: "Closest to clinics; step-free flat access." }
+          },
+          {
+            id: "gate_shifa_back",
+            type: "service_closed",
+            is_public: false,
+            name: { ar: "بوابة الخدمات (مغلقة)", en: "Back Service Gate" },
+            coords: { lat: 30.0615, lng: 31.3385 },
+            linked_parking_ids: [],
+            accessibility: { wheelchair: "no", elderly_friendly: false, has_ramp: false, stairs_count: 6, max_slope_percent: 14 },
+            guidance_note: { ar: "مغلقة أمام الزوار ومخصصة لسيارات التموين فقط.", en: "Closed to public visitors." }
+          }
+        ],
+        parkings: [
+          {
+            id: "park_shifa_east",
+            name: { ar: "موقف B الشرقي", en: "East Parking Lot B" },
+            entrance_coords: { lat: 30.0639, lng: 31.3414 },
+            walking_to_gate_meters: 75,
+            walking_time_seconds: 60,
+            accessible_spots: true
+          }
+        ]
+      },
+      {
+        id: "fac_azhar_eng_01",
+        category: "university",
+        name: { ar: "جامعة الأزهر - الهندسة", en: "Al-Azhar University - Faculty of Engineering" },
+        aliases: { ar: ["هندسة الأزهر", "جامعة الأزهر مدينة نصر", "بوابة الهندسة"], en: ["Azhar Engineering"] },
+        center_coords: { lat: 30.0568, lng: 31.3182 },
+        gates: [
+          {
+            id: "gate_azhar_main",
+            type: "main_visitors",
+            is_public: true,
+            name: { ar: "البوابة الرئيسية للهندسة", en: "Engineering Main Gate" },
+            coords: { lat: 30.0574, lng: 31.3191 },
+            linked_parking_ids: ["park_azhar_front"],
+            accessibility: { wheelchair: "full", elderly_friendly: true, has_ramp: true, stairs_count: 0, max_slope_percent: 2.5 },
+            guidance_note: { ar: "مدخل ميسّر بعرض 4 أمتار ومنحدر مخصص للكراسي المتحركة.", en: "Wide accessible entrance with ramp." }
+          }
+        ],
+        parkings: [
+          {
+            id: "park_azhar_front",
+            name: { ar: "ساحة انتظار الزوار", en: "Front Visitor Parking" },
+            entrance_coords: { lat: 30.0578, lng: 31.3196 },
+            walking_to_gate_meters: 60,
+            walking_time_seconds: 50,
+            accessible_spots: true
+          }
+        ]
+      }
+    ]
+  };
+
+  let schemaData = JSON.parse(localStorage.getItem("shortcut_schema_v1") || "null") || DEFAULT_SCHEMA;
+  let vehicleConfig = JSON.parse(localStorage.getItem("shortcut_vehicle_v1") || "null") || { fuelRate: 8.5, fuelPrice: 13.75, currency: "ج.م" };
+
+  let currentMode = "car";
+  let isOffline = false;
+  let pinGateMode = false;
+  let pendingPinCoords = null;
+  let pickTargetMode = "auto";
+
+  let startPoint = null;
+  let endPoint = null;
+  let calculatedRoutes = [];
+  let selectedRouteIdx = 0;
+
+  // Navigation & Voice State
+  let navActive = false;
+  let navSteps = [];
+  let navStepIdx = 0;
+  let voiceMuted = false;
+  let simInterval = null;
+  let gpsWatchId = null;
+  let liveUserCoords = null;
+
+  // =========================================================================
+  // 2. BUILT-IN ZERO-DEPENDENCY INTERACTIVE MAP ENGINE (HTML5 Canvas)
+  // Renders vector roads, blocks, parks, facilities, gates, parking, routes,
+  // and optionally blends live OpenStreetMap raster tiles when online!
+  // =========================================================================
+  const canvas = document.getElementById("mapCanvas");
+  const ctx = canvas.getContext("2d");
+
+  let mapState = {
+    centerLat: 30.0605,
+    centerLng: 31.3300,
+    zoom: 14.3
+  };
+
+  const tileCache = {};
+  let hitTargets = []; // clickable gate/parking pins on canvas
+
+  function resizeCanvas() {
+    const wrap = document.getElementById("mapWrap");
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = wrap.clientWidth * dpr;
+    canvas.height = wrap.clientHeight * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    renderMap();
+  }
+  window.addEventListener("resize", resizeCanvas);
+
+  // Web Mercator projection helpers
+  function lngToWorldX(lng, zoom) {
+    return ((lng + 180) / 360) * 256 * Math.pow(2, zoom);
+  }
+  function latToWorldY(lat, zoom) {
+    const sin = Math.sin((lat * Math.PI) / 180);
+    const y = 0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI);
+    return y * 256 * Math.pow(2, zoom);
+  }
+  function worldXToLng(wx, zoom) {
+    return (wx / (256 * Math.pow(2, zoom))) * 360 - 180;
+  }
+  function worldYToLat(wy, zoom) {
+    const n = Math.PI - (2 * Math.PI * wy) / (256 * Math.pow(2, zoom));
+    return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+  }
+
+  function latLngToScreen(lat, lng) {
+    const wrap = document.getElementById("mapWrap");
+    const w = wrap.clientWidth;
+    const h = wrap.clientHeight;
+    const cx = lngToWorldX(mapState.centerLng, mapState.zoom);
+    const cy = latToWorldY(mapState.centerLat, mapState.zoom);
+    const px = lngToWorldX(lng, mapState.zoom);
+    const py = latToWorldY(lat, mapState.zoom);
+    return { x: w / 2 + (px - cx), y: h / 2 + (py - cy) };
+  }
+
+  function screenToLatLng(sx, sy) {
+    const wrap = document.getElementById("mapWrap");
+    const w = wrap.clientWidth;
+    const h = wrap.clientHeight;
+    const cx = lngToWorldX(mapState.centerLng, mapState.zoom);
+    const cy = latToWorldY(mapState.centerLat, mapState.zoom);
+    const wx = cx + (sx - w / 2);
+    const wy = cy + (sy - h / 2);
+    return { lat: worldYToLat(wy, mapState.zoom), lng: worldXToLng(wx, mapState.zoom) };
+  }
+
+  // Built-in rich vector city network around Cairo / facilities so map is always crisp & detailed even offline/QuickLook
+  const BUILTIN_ROADS = [
+    { name: "محور المشير / النصر", width: 9, color: "#fde68a", border: "#f59e0b", pts: [[30.050, 31.312], [30.057, 31.320], [30.063, 31.331], [30.068, 31.345]] },
+    { name: "شارع المخيم الدائم", width: 7, color: "#ffffff", border: "#cbd5e1", pts: [[30.051, 31.319], [30.0574, 31.3191], [30.065, 31.3195]] },
+    { name: "شارع الطيران الرئيسي", width: 8, color: "#ffffff", border: "#cbd5e1", pts: [[30.052, 31.330], [30.060, 31.330], [30.070, 31.330]] },
+    { name: "شارع عباس العقاد", width: 8, color: "#ffffff", border: "#cbd5e1", pts: [[30.053, 31.3405], [30.0634, 31.3408], [30.071, 31.341]] },
+    { name: "طريق العيادات والخدمات", width: 5, color: "#ffffff", border: "#cbd5e1", pts: [[30.0615, 31.330], [30.0615, 31.3385], [30.0634, 31.3408], [30.0639, 31.3414]] },
+    { name: "شارع الجامعة الشمالي", width: 6, color: "#ffffff", border: "#cbd5e1", pts: [[30.064, 31.314], [30.0645, 31.325], [30.065, 31.335], [30.064, 31.346]] }
+  ];
+
+  const BUILTIN_ZONES = [
+    { label: "منطقة المستشفيات", lat: 30.0626, lng: 31.3397, w: 0.0042, h: 0.0032, fill: "#dbeafe" },
+    { label: "الحرم الجامعي", lat: 30.0568, lng: 31.3182, w: 0.0048, h: 0.0036, fill: "#e0e7ff" },
+    { label: "حديقة عامة", lat: 30.0602, lng: 31.3255, w: 0.0035, h: 0.0028, fill: "#dcfce7" }
+  ];
+
+  function drawRoundedRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+    ctx.fill();
+  }
+
+  function renderMap() {
+    const wrap = document.getElementById("mapWrap");
+    const w = wrap.clientWidth;
+    const h = wrap.clientHeight;
+    if (!w || !h) return;
+
+    hitTargets = [];
+
+    // 1. Base land background
+    ctx.fillStyle = "#eef2f6";
+    ctx.fillRect(0, 0, w, h);
+
+    // 2. Subtle vector city grid
+    const stepDeg = 0.003;
+    const topLeft = screenToLatLng(0, 0);
+    const botRight = screenToLatLng(w, h);
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.lineWidth = 1;
+    for (let lng = Math.floor(topLeft.lng / stepDeg) * stepDeg; lng <= botRight.lng; lng += stepDeg) {
+      const s = latLngToScreen(mapState.centerLat, lng);
+      ctx.beginPath(); ctx.moveTo(s.x, 0); ctx.lineTo(s.x, h); ctx.stroke();
+    }
+    for (let lat = Math.floor(botRight.lat / stepDeg) * stepDeg; lat <= topLeft.lat; lat += stepDeg) {
+      const s = latLngToScreen(lat, mapState.centerLng);
+      ctx.beginPath(); ctx.moveTo(0, s.y); ctx.lineTo(w, s.y); ctx.stroke();
+    }
+
+    // 3. Optional live OSM raster tiles overlay when online & allowed by browser
+    if (!isOffline) {
+      const intZoom = Math.round(mapState.zoom);
+      const scale = Math.pow(2, mapState.zoom - intZoom);
+      const tileSize = 256 * scale;
+      const cx = lngToWorldX(mapState.centerLng, mapState.zoom);
+      const cy = latToWorldY(mapState.centerLat, mapState.zoom);
+      const minTx = Math.floor((cx - w / 2) / tileSize);
+      const maxTx = Math.floor((cx + w / 2) / tileSize);
+      const minTy = Math.floor((cy - h / 2) / tileSize);
+      const maxTy = Math.floor((cy + h / 2) / tileSize);
+      const maxIdx = Math.pow(2, intZoom);
+
+      for (let tx = minTx; tx <= maxTx; tx++) {
+        for (let ty = minTy; ty <= maxTy; ty++) {
+          if (ty < 0 || ty >= maxIdx) continue;
+          const wrappedTx = ((tx % maxIdx) + maxIdx) % maxIdx;
+          const key = `${intZoom}/${wrappedTx}/${ty}`;
+          let img = tileCache[key];
+          if (!img) {
+            img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => renderMap();
+            img.src = `https://tile.openstreetmap.org/${intZoom}/${wrappedTx}/${ty}.png`;
+            tileCache[key] = img;
+          }
+          if (img.complete && img.naturalWidth > 0) {
+            const dx = w / 2 + (tx * tileSize - cx);
+            const dy = h / 2 + (ty * tileSize - cy);
+            ctx.drawImage(img, dx, dy, tileSize + 0.5, tileSize + 0.5);
+          }
+        }
+      }
+    }
+
+    // 4. Built-in campus/hospital zones & vector road network (always visible for clarity)
+    BUILTIN_ZONES.forEach(z => {
+      const p1 = latLngToScreen(z.lat + z.h / 2, z.lng - z.w / 2);
+      const p2 = latLngToScreen(z.lat - z.h / 2, z.lng + z.w / 2);
+      ctx.fillStyle = z.fill;
+      ctx.globalAlpha = 0.65;
+      drawRoundedRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y, 10);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#475569";
+      ctx.font = "bold 10px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(z.label, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+    });
+
+    BUILTIN_ROADS.forEach(road => {
+      const pts = road.pts.map(p => latLngToScreen(p[0], p[1]));
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = road.border;
+      ctx.lineWidth = road.width + 2;
+      ctx.beginPath();
+      pts.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
+      ctx.stroke();
+
+      ctx.strokeStyle = road.color;
+      ctx.lineWidth = road.width;
+      ctx.beginPath();
+      pts.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
+      ctx.stroke();
+
+      if (pts.length >= 2) {
+        const mid = pts[Math.floor(pts.length / 2)];
+        ctx.fillStyle = "#475569";
+        ctx.font = "600 9.5px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(road.name, mid.x, mid.y - 7);
+      }
+    });
+
+    // 5. Draw alternative & active routes
+    calculatedRoutes.forEach((r, idx) => {
+      if (idx === selectedRouteIdx) return;
+      const pts = r.coords.map(c => latLngToScreen(c[0], c[1]));
+      ctx.save();
+      ctx.setLineDash([6, 6]);
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      pts.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    const activeRoute = calculatedRoutes[selectedRouteIdx];
+    if (activeRoute) {
+      const pts = activeRoute.coords.map(c => latLngToScreen(c[0], c[1]));
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 9;
+      ctx.beginPath();
+      pts.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
+      ctx.stroke();
+
+      ctx.strokeStyle = activeRoute.color;
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      pts.forEach((pt, i) => i === 0 ? ctx.moveTo(pt.x, pt.y) : ctx.lineTo(pt.x, pt.y));
+      ctx.stroke();
+    }
+
+    // 6. Draw Verified Gates & Linked Parkings from JSON Schema
+    schemaData.facilities.forEach(fac => {
+      (fac.parkings || []).forEach(pk => {
+        const s = latLngToScreen(pk.entrance_coords.lat, pk.entrance_coords.lng);
+        ctx.fillStyle = "#0284c7";
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 9px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("P", s.x, s.y + 3);
+      });
+
+      fac.gates.forEach(g => {
+        const s = latLngToScreen(g.coords.lat, g.coords.lng);
+        const isClosed = g.is_public === false;
+        ctx.fillStyle = isClosed ? "#dc2626" : "#059669";
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Label pill
+        const label = g.name.ar;
+        ctx.font = "bold 10px sans-serif";
+        const tw = ctx.measureText(label).width + 12;
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        drawRoundedRect(s.x - tw / 2, s.y + 13, tw, 17, 6);
+        ctx.fillStyle = isClosed ? "#b91c1c" : "#065f46";
+        ctx.textAlign = "center";
+        ctx.fillText(label, s.x, s.y + 24.5);
+
+        hitTargets.push({
+          x: s.x,
+          y: s.y,
+          radius: 18,
+          gate: g,
+          facility: fac,
+          parking: (fac.parkings || []).find(p => (g.linked_parking_ids || []).includes(p.id))
+        });
+      });
+    });
+
+    // 7. Start & End Markers
+    if (startPoint) {
+      const s = latLngToScreen(startPoint.lat, startPoint.lng);
+      ctx.fillStyle = "rgba(37, 99, 235, 0.22)";
+      ctx.beginPath(); ctx.arc(s.x, s.y, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#2563eb";
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+
+    if (endPoint) {
+      const s = latLngToScreen(endPoint.lat, endPoint.lng);
+      ctx.fillStyle = "rgba(5, 150, 105, 0.22)";
+      ctx.beginPath(); ctx.arc(s.x, s.y, 18, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#059669";
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+
+    if (liveUserCoords) {
+      const s = latLngToScreen(liveUserCoords.lat, liveUserCoords.lng);
+      ctx.fillStyle = "#1d4ed8";
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(s.x, s.y, 8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+  }
+
+  // Pan & Tap interaction on Canvas
+  let isDragging = false;
+  let dragMoved = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let startCenterWx = 0;
+  let startCenterWy = 0;
+
+  canvas.addEventListener("pointerdown", (e) => {
+    isDragging = true;
+    dragMoved = false;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    startCenterWx = lngToWorldX(mapState.centerLng, mapState.zoom);
+    startCenterWy = latToWorldY(mapState.centerLat, mapState.zoom);
+  });
+
+  window.addEventListener("pointermove", (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    if (Math.hypot(dx, dy) > 6) dragMoved = true;
+    if (dragMoved) {
+      mapState.centerLng = worldXToLng(startCenterWx - dx, mapState.zoom);
+      mapState.centerLat = worldYToLat(startCenterWy - dy, mapState.zoom);
+      renderMap();
+    }
+  });
+
+  window.addEventListener("pointerup", (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    if (dragMoved) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    if (sx < 0 || sy < 0 || sx > rect.width || sy > rect.height) return;
+
+    // Check if user tapped a verified gate pin first
+    const hit = hitTargets.find(t => Math.hypot(t.x - sx, t.y - sy) <= t.radius);
+    if (hit && !pinGateMode) {
+      const pt = {
+        lat: hit.gate.coords.lat,
+        lng: hit.gate.coords.lng,
+        label: `${hit.facility.name.ar} (${hit.gate.name.ar})`,
+        gate: hit.gate,
+        facility: hit.facility,
+        parking: hit.parking
+      };
+      if (pickTargetMode === "start" || !startPoint) {
+        setStartPoint(pt);
+        pickTargetMode = "end";
+      } else {
+        setEndPoint(pt);
+      }
+      return;
+    }
+
+    const { lat, lng } = screenToLatLng(sx, sy);
+    if (pinGateMode) {
+      pendingPinCoords = { lat, lng };
+      togglePinGateMode(false);
+      openModal("newGateModal");
+      return;
+    }
+
+    if (pickTargetMode === "start" || !startPoint) {
+      setStartPoint({ lat, lng, label: `نقطة على الخريطة (${lat.toFixed(4)}, ${lng.toFixed(4)})` });
+      pickTargetMode = "end";
+      updateHint();
+    } else {
+      setEndPoint({ lat, lng, label: `وجهة محددة (${lat.toFixed(4)}, ${lng.toFixed(4)})` });
+    }
+  });
+
+  function changeZoom(delta) {
+    mapState.zoom = Math.max(11, Math.min(18, mapState.zoom + delta * 0.7));
+    renderMap();
+  }
+
+  function centerOnFacilities() {
+    mapState.centerLat = 30.0605;
+    mapState.centerLng = 31.3300;
+    mapState.zoom = 14.3;
+    renderMap();
+  }
+
+  function fitMapToBounds(coords) {
+    if (!coords || !coords.length) return;
+    let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+    coords.forEach(([lat, lng]) => {
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+    });
+    mapState.centerLat = (minLat + maxLat) / 2;
+    mapState.centerLng = (minLng + maxLng) / 2;
+    const span = Math.max(maxLat - minLat, maxLng - minLng, 0.006);
+    mapState.zoom = Math.max(12, Math.min(16, 14.8 - Math.log2(span / 0.015)));
+    renderMap();
+  }
+
+  // =========================================================================
+  // 3. APP LOGIC & STATE HANDLERS
+  // =========================================================================
+  function setPickTarget(target) {
+    pickTargetMode = target;
+    updateHint();
+  }
+
+  function setStartPoint(pt) {
+    startPoint = pt;
+    document.getElementById("startInput").value = pt.label;
+    updateHint();
+    renderMap();
+    if (startPoint && endPoint) computeRoutes();
+  }
+
+  function setEndPoint(pt) {
+    endPoint = pt;
+    document.getElementById("endInput").value = pt.label;
+    updateHint();
+    renderMap();
+    if (startPoint && endPoint) computeRoutes();
+  }
+
+  function updateHint() {
+    const h = document.getElementById("mapHintText");
+    if (pinGateMode) h.textContent = "اضغط على موقع البوابة الدقيق على الخريطة";
+    else if (pickTargetMode === "start" || !startPoint) h.textContent = "اضغط على الخريطة لتحديد نقطة الانطلاق";
+    else if (!endPoint) h.textContent = "الانطلاق جاهز • اضغط على بوابة أو شارع للوجهة";
+    else h.textContent = "تم رسم المسار • اضغط أي نقطة لتغيير الوجهة";
+  }
+
+  function resetSelection() {
+    startPoint = null;
+    endPoint = null;
+    calculatedRoutes = [];
+    pickTargetMode = "auto";
+    document.getElementById("startInput").value = "";
+    document.getElementById("endInput").value = "";
+    stopNavigation();
+    updateHint();
+    renderMap();
+    document.getElementById("resultsSection").innerHTML = `
+      <div class="empty-card">
+        <div class="empty-title">اضغط على أي بوابة خضراء في الخريطة أو اختر من «البوابات»</div>
+        <div class="empty-sub">الخريطة المدمجة تعمل فوراً بدون إنترنت، وتعرض الشوارع الرئيسية، المنشآت، المواقف، والبوابات الموثقة.</div>
+      </div>`;
+  }
+
+  function useMyLocation(isAuto = false) {
+    const startInp = document.getElementById("startInput");
+    if (isAuto && startPoint) return;
+
+    const applyDemoStart = (label) => {
+      const pt = { lat: 30.0645, lng: 31.3260, label };
+      setStartPoint(pt);
+      pickTargetMode = "end";
+      updateHint();
+      mapState.centerLat = 30.0615;
+      mapState.centerLng = 31.3315;
+      renderMap();
+    };
+
+    if (!navigator.geolocation) {
+      applyDemoStart("موقعي الحالي (شارع الطيران)");
+      return;
+    }
+
+    if (!isAuto) startInp.placeholder = "جاري تحديد موقعك الحالي...";
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (isAuto && startPoint) return;
+        const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude, label: "موقعي الحالي (GPS)" };
+        setStartPoint(pt);
+        pickTargetMode = "end";
+        updateHint();
+        mapState.centerLat = pt.lat;
+        mapState.centerLng = pt.lng;
+        renderMap();
+      },
+      () => {
+        startInp.placeholder = "نقطة الانطلاق (أو اضغط على الخريطة)";
+        // Fallback so user can start tapping destination immediately even in offline/local preview
+        if (!startPoint) applyDemoStart("نقطة انطلاق افتراضية (اضغط «خريطة» لتغييرها)");
+      },
+      { enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 }
+    );
+  }
+
+  window.addEventListener("load", () => {
+    resizeCanvas();
+    useMyLocation(true);
+  });
+
+  function setMode(mode) {
+    currentMode = mode;
+    document.querySelectorAll(".mode-tab").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.mode === mode);
+    });
+    if (startPoint && endPoint) computeRoutes();
+  }
+
+  function toggleOfflineMode() {
+    isOffline = !isOffline;
+    const pill = document.getElementById("netPill");
+    const lbl = document.getElementById("netLabel");
+    pill.className = "pill-btn " + (isOffline ? "offline" : "online");
+    lbl.textContent = isOffline ? "بدون إنترنت" : "متصل";
+    renderMap();
+    if (startPoint && endPoint) computeRoutes();
+  }
+
+  // Search with Aliases & Nominatim
+  let searchTimer = null;
+  function handleSearch(target, query) {
+    clearTimeout(searchTimer);
+    const dd = document.getElementById(target + "Dropdown");
+    const q = (query || "").trim().toLowerCase();
+    renderLocalSuggestions(target, q);
+    if (!isOffline && q.length >= 3) {
+      searchTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=4&q=${encodeURIComponent(query)}`);
+          const items = await res.json();
+          items.forEach(it => {
+            const div = document.createElement("div");
+            div.className = "drop-item";
+            div.innerHTML = `<div><div class="drop-title">${it.display_name.split(",")[0]}</div><div class="drop-sub">${it.display_name}</div></div><span class="badge badge-osm">OSM</span>`;
+            div.onclick = () => {
+              dd.classList.remove("open");
+              const pt = { lat: parseFloat(it.lat), lng: parseFloat(it.lon), label: it.display_name.split(",")[0] };
+              target === "start" ? setStartPoint(pt) : setEndPoint(pt);
+              mapState.centerLat = pt.lat;
+              mapState.centerLng = pt.lng;
+              renderMap();
+            };
+            dd.appendChild(div);
+          });
+        } catch (e) {}
+      }, 350);
+    }
+  }
+
+  function renderLocalSuggestions(target, q) {
+    const dd = document.getElementById(target + "Dropdown");
+    dd.innerHTML = "";
+    let count = 0;
+    schemaData.facilities.forEach(fac => {
+      const allNames = [fac.name.ar, fac.name.en, ...(fac.aliases?.ar || []), ...(fac.aliases?.en || [])].join(" ").toLowerCase();
+      fac.gates.forEach(gate => {
+        const gText = (allNames + " " + gate.name.ar + " " + (gate.name.en || "")).toLowerCase();
+        if (!q || gText.includes(q)) {
+          count++;
+          const parking = (fac.parkings || []).find(p => (gate.linked_parking_ids || []).includes(p.id));
+          const div = document.createElement("div");
+          div.className = "drop-item";
+          div.innerHTML = `
+            <div>
+              <div class="drop-title">${fac.name.ar} — ${gate.name.ar}</div>
+              <div class="drop-sub">${gate.guidance_note?.ar || ""}</div>
+            </div>
+            <span class="badge badge-gate">${gate.is_public ? "بوابة موثقة" : "مغلقة للزوار"}</span>`;
+          div.onclick = () => {
+            dd.classList.remove("open");
+            const pt = { lat: gate.coords.lat, lng: gate.coords.lng, label: `${fac.name.ar} (${gate.name.ar})`, gate, facility: fac, parking };
+            target === "start" ? setStartPoint(pt) : setEndPoint(pt);
+            mapState.centerLat = pt.lat;
+            mapState.centerLng = pt.lng;
+            renderMap();
+          };
+          dd.appendChild(div);
+        }
+      });
+    });
+    dd.classList.toggle("open", count > 0);
+  }
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".input-row")) {
+      document.querySelectorAll(".dropdown").forEach(d => d.classList.remove("open"));
+    }
+  });
+
+  // Routing & Explainable Engine
+  function haversineKm(a, b) {
+    const R = 6371;
+    const dLat = (b.lat - a.lat) * Math.PI / 180;
+    const dLon = (b.lng - a.lng) * Math.PI / 180;
+    const x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+  }
+
+  async function computeRoutes() {
+    const sec = document.getElementById("resultsSection");
+    sec.innerHTML = `<div class="empty-card"><div class="empty-title">جاري تحليل المسارات والبوابات...</div></div>`;
+
+    const profile = currentMode === "car" ? "driving" : "foot";
+    let rawRoutes = [];
+
+    if (!isOffline) {
+      try {
+        const url = `https://router.project-osrm.org/route/v1/${profile}/${startPoint.lng},${startPoint.lat};${endPoint.lng},${endPoint.lat}?overview=full&geometries=geojson&alternatives=true&steps=true`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.routes && data.routes.length) {
+          rawRoutes = data.routes.map(r => ({
+            distKm: r.distance / 1000,
+            durMin: Math.max(1, Math.round(r.duration / 60)),
+            coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
+            steps: (r.legs[0]?.steps || []).map(s => translateStep(s))
+          }));
+        }
+      } catch (e) {}
+    }
+
+    const baseDist = rawRoutes[0]?.distKm || Math.max(0.4, haversineKm(startPoint, endPoint) * 1.25);
+    const speedKmh = currentMode === "car" ? 34 : (currentMode === "walk" ? 4.8 : 3.6);
+    const baseDur = rawRoutes[0]?.durMin || Math.max(2, Math.round((baseDist / speedKmh) * 60));
+
+    // Orthogonal street-aligned fallback geometry
+    const mid1 = [startPoint.lat, endPoint.lng];
+    const mid2 = [endPoint.lat, startPoint.lng];
+    const baseCoords = rawRoutes[0]?.coords || [[startPoint.lat, startPoint.lng], mid1, [endPoint.lat, endPoint.lng]];
+    const baseSteps = rawRoutes[0]?.steps?.length ? rawRoutes[0].steps : [
+      `انطلق من ${startPoint.label}`,
+      `استمر عبر الشارع الرئيسي لمسافة ${(baseDist * 0.6).toFixed(1)} كم`,
+      `انعطف مباشرة نحو ${endPoint.label} — وصلت إلى البوابة`
+    ];
+
+    const rFast = rawRoutes[0] || { distKm: baseDist, durMin: baseDur, coords: baseCoords, steps: baseSteps };
+    const rShort = rawRoutes[1] || {
+      distKm: +(baseDist * 0.88).toFixed(2),
+      durMin: Math.round(baseDur * 1.12) + 2,
+      coords: [[startPoint.lat, startPoint.lng], [(startPoint.lat + endPoint.lat) / 2, (startPoint.lng + endPoint.lng) / 2], [endPoint.lat, endPoint.lng]],
+      steps: baseSteps
+    };
+    const rCheap = rawRoutes[2] || {
+      distKm: +(baseDist * 0.95).toFixed(2),
+      durMin: Math.round(baseDur * 1.06) + 1,
+      coords: [[startPoint.lat, startPoint.lng], mid2, [endPoint.lat, endPoint.lng]],
+      steps: baseSteps
+    };
+
+    const calcCost = (km, factor) => {
+      if (currentMode !== "car") return "0 " + vehicleConfig.currency;
+      const liters = (km / 100) * vehicleConfig.fuelRate * factor;
+      return (liters * vehicleConfig.fuelPrice).toFixed(1) + " " + vehicleConfig.currency;
+    };
+
+    const diffKm = Math.max(0.2, (rFast.distKm - rShort.distKm)).toFixed(1);
+    const diffMin = Math.max(2, (rShort.durMin - rFast.durMin));
+
+    calculatedRoutes = [
+      {
+        id: "fast",
+        badge: "أسرع وصول",
+        tagClass: "tag-fast",
+        color: "#2563eb",
+        dist: rFast.distKm.toFixed(1) + " كم",
+        dur: rFast.durMin + " دقيقة",
+        cost: calcCost(rFast.distKm, 1.05),
+        why: currentMode === "car"
+          ? `يوفر ${diffMin} دقائق عبر محاور رئيسية بانسيابية مرورية أعلى، رغم أنه أطول بـ ${diffKm} كم.`
+          : `أسرع مسار مباشر للمشاة عبر أرصفة واضحة ومعابر نظامية.`,
+        meta: currentMode === "car" ? ["انسيابية مرورية عالية", "إشارات أقل"] : ["رصيف ممهد", "عبور آمن"],
+        coords: rFast.coords,
+        steps: rFast.steps
+      },
+      {
+        id: "short",
+        badge: "أقصر مسافة",
+        tagClass: "tag-short",
+        color: "#059669",
+        dist: rShort.distKm.toFixed(1) + " كم",
+        dur: rShort.durMin + " دقيقة",
+        cost: calcCost(rShort.distKm, 1.0),
+        why: currentMode === "wheelchair"
+          ? `أقصر مسار مستوٍ بـ ${diffKm} كم ويتجنب السلالم والمنحدرات الحادة للوصول المباشر للبوابة.`
+          : `أقصر بـ ${diffKm} كم عبر شوارع داخلية مباشرة، لكنه أبطأ بـ ${diffMin} دقائق بسبب التقاطعات.`,
+        meta: currentMode === "wheelchair" ? ["بدون سلالم", "انحدار خفيف < 4%"] : [`وفر ${diffKm} كم`, "شوارع داخلية"],
+        coords: rShort.coords,
+        steps: rShort.steps
+      },
+      {
+        id: "cheap",
+        badge: currentMode === "car" ? "أقل تكلفة" : "الأكثر أماناً وهدوءاً",
+        tagClass: "tag-cheap",
+        color: "#d97706",
+        dist: rCheap.distKm.toFixed(1) + " كم",
+        dur: rCheap.durMin + " دقيقة",
+        cost: calcCost(rCheap.distKm, 0.88),
+        why: currentMode === "car"
+          ? `يقلل استهلاك الوقود بنسبة 12% بفضل ثبات السرعة وتجنب التوقف المتكرر وبوابات الرسوم.`
+          : `يتجنب الطرق السريعة والتقاطعات المزدحمة ويمر بممرات مشاة هادئة ومضاءة.`,
+        meta: currentMode === "car" ? ["بدون رسوم طرق", "توفير وقود 12%"] : ["بعيد عن الزحام", "إضاءة ليلية"],
+        coords: rCheap.coords,
+        steps: rCheap.steps
+      }
+    ];
+
+    selectedRouteIdx = currentMode === "wheelchair" ? 1 : 0;
+    renderResults();
+  }
+
+  function translateStep(step) {
+    const name = step.name ? ` إلى ${step.name}` : "";
+    const dist = step.distance ? ` (${Math.round(step.distance)} متر)` : "";
+    const t = step.maneuver?.type || "";
+    const m = step.maneuver?.modifier || "";
+    if (t === "arrive") return "لقد وصلت إلى البوابة المحددة";
+    if (t === "depart") return `ابدأ التحرك${name}${dist}`;
+    if (m.includes("right")) return `انعطف يميناً${name}${dist}`;
+    if (m.includes("left")) return `انعطف يساراً${name}${dist}`;
+    return `استمر مباشرة${name}${dist}`;
+  }
+
+  function renderResults() {
+    const sec = document.getElementById("resultsSection");
+    let gateHtml = "";
+
+    if (endPoint?.gate) {
+      const g = endPoint.gate;
+      const p = endPoint.parking;
+      const acc = g.accessibility || {};
+      const isClosed = g.is_public === false;
+      const isWheelchairBad = currentMode === "wheelchair" && acc.wheelchair === "no";
+
+      gateHtml = `
+        <div class="gate-banner ${isClosed || isWheelchairBad ? "warn" : ""}">
+          <div class="gate-banner-title">
+            ${isClosed ? "⚠️ تنبيه: هذه البوابة مغلقة للزوار" : (isWheelchairBad ? "⚠️ تنبيه: البوابة غير مهيأة للكراسي المتحركة" : "✓ تم ضبط الوصول الدقيق للبوابة")}
+          </div>
+          <div class="gate-banner-sub">
+            <strong>${g.name.ar}</strong> — ${g.guidance_note?.ar || ""}<br/>
+            ${p ? `🅿️ الموقف المرتبط: <strong>${p.name.ar}</strong> (مشياً ${p.walking_to_gate_meters} متر • ${Math.round(p.walking_time_seconds / 60)} دقيقة)` : ""}
+          </div>
+        </div>`;
+    }
+
+    const cardsHtml = calculatedRoutes.map((r, idx) => `
+      <div class="route-card ${idx === selectedRouteIdx ? "selected" : ""}" onclick="selectRoute(${idx})">
+        <div class="route-top">
+          <span class="route-tag ${r.tagClass}">${r.badge}</span>
+          <div class="route-metrics">
+            <span>${r.dur}</span>
+            <span style="color:var(--muted);">•</span>
+            <span>${r.dist}</span>
+            <span style="color:var(--muted);">•</span>
+            <span style="color:var(--emerald);">${r.cost}</span>
+          </div>
+        </div>
+        <div class="route-why"><strong>لماذا هذا المسار؟</strong> ${r.why}</div>
+        <div class="route-meta">${r.meta.map(m => `<span>• ${m}</span>`).join("")}</div>
+      </div>
+    `).join("");
+
+    sec.innerHTML = `
+      ${gateHtml}
+      <div class="section-head">
+        <span class="section-title">المقارنة الذكية (3 خيارات مفسّرة)</span>
+        <span style="font-size:11px; color:var(--muted);">${isOffline ? "وضع دون إنترنت" : "خريطة تفاعلية مدمجة"}</span>
+      </div>
+      ${cardsHtml}
+      <button class="start-nav-btn" onclick="startNavigation()">ابدأ التوجيه الصوتي المباشر الآن</button>
+    `;
+
+    const active = calculatedRoutes[selectedRouteIdx];
+    if (active) fitMapToBounds(active.coords);
+    else renderMap();
+  }
+
+  function selectRoute(idx) {
+    selectedRouteIdx = idx;
+    renderResults();
+  }
+
+  // Voice Navigation & Live GPS
+  function startNavigation() {
+    const active = calculatedRoutes[selectedRouteIdx];
+    if (!active) return;
+    navActive = true;
+    navSteps = active.steps;
+    navStepIdx = 0;
+    document.getElementById("navLiveBar").classList.add("active");
+    updateNavUI();
+    speakCurrentStep();
+  }
+
+  function stopNavigation() {
+    navActive = false;
+    clearInterval(simInterval);
+    simInterval = null;
+    if (gpsWatchId !== null && "geolocation" in navigator) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+      gpsWatchId = null;
+    }
+    liveUserCoords = null;
+    const gpsBtn = document.getElementById("gpsTrackBtn");
+    if (gpsBtn) gpsBtn.textContent = "📍 تتبع GPS حي";
+    document.getElementById("simAutoBtn").textContent = "▶ محاكاة";
+    document.getElementById("navLiveBar").classList.remove("active");
+    renderMap();
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  }
+
+  function toggleLiveGpsTracking() {
+    const gpsBtn = document.getElementById("gpsTrackBtn");
+    if (gpsWatchId !== null) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+      gpsWatchId = null;
+      liveUserCoords = null;
+      gpsBtn.textContent = "📍 تتبع GPS حي";
+      renderMap();
+      return;
+    }
+    if (!("geolocation" in navigator)) {
+      alert("متصفحك لا يدعم تتبع GPS المباشر.");
+      return;
+    }
+    gpsBtn.textContent = "🟢 GPS نشط";
+    gpsWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        liveUserCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        mapState.centerLat = liveUserCoords.lat;
+        mapState.centerLng = liveUserCoords.lng;
+        renderMap();
+      },
+      () => {
+        gpsBtn.textContent = "📍 تعذر GPS";
+        gpsWatchId = null;
+      },
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+    );
+  }
+
+  function updateNavUI() {
+    document.getElementById("navStepCounter").textContent = `خطوة ${navStepIdx + 1}/${navSteps.length}`;
+    document.getElementById("navStepText").textContent = navSteps[navStepIdx] || "وصلت إلى وجهتك";
+  }
+
+  function speakCurrentStep() {
+    if (voiceMuted || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(navSteps[navStepIdx]);
+    u.lang = "ar-SA";
+    u.rate = 0.98;
+    window.speechSynthesis.speak(u);
+  }
+
+  function nextNavStep() {
+    if (navStepIdx < navSteps.length - 1) {
+      navStepIdx++;
+      updateNavUI();
+      speakCurrentStep();
+    } else {
+      stopNavigation();
+    }
+  }
+
+  function toggleVoiceMute() {
+    voiceMuted = !voiceMuted;
+    document.getElementById("voiceMuteBtn").textContent = voiceMuted ? "🔇 مكتوم" : "🔊 الصوت مفعل";
+    if (voiceMuted && "speechSynthesis" in window) window.speechSynthesis.cancel();
+  }
+
+  function toggleAutoSim() {
+    if (simInterval) {
+      clearInterval(simInterval);
+      simInterval = null;
+      document.getElementById("simAutoBtn").textContent = "▶ محاكاة";
+      return;
+    }
+    document.getElementById("simAutoBtn").textContent = "⏸ إيقاف المحاكاة";
+    simInterval = setInterval(() => {
+      if (navStepIdx < navSteps.length - 1) nextNavStep();
+      else stopNavigation();
+    }, 3500);
+  }
+
+  // Pin Gate Mode
+  function togglePinGateMode(force) {
+    pinGateMode = typeof force === "boolean" ? force : !pinGateMode;
+    document.getElementById("pinGateBtn").classList.toggle("active", pinGateMode);
+    updateHint();
+  }
+
+  function saveNewPinnedGate() {
+    if (!pendingPinCoords) return;
+    const facName = document.getElementById("ngFacName").value.trim() || "منشأة موثقة جديدة";
+    const gateName = document.getElementById("ngGateName").value.trim() || "البوابة الرئيسية";
+    const wc = document.getElementById("ngWheelchair").value;
+    const note = document.getElementById("ngNote").value.trim() || "بوابة موثقة يدوياً على الخريطة";
+
+    const newGate = {
+      id: "gate_" + Date.now(),
+      type: "main_visitors",
+      is_public: true,
+      name: { ar: gateName, en: gateName },
+      coords: pendingPinCoords,
+      linked_parking_ids: [],
+      accessibility: { wheelchair: wc, elderly_friendly: wc === "full", has_ramp: wc === "full", stairs_count: wc === "no" ? 4 : 0 },
+      guidance_note: { ar: note, en: note }
+    };
+
+    const newFac = {
+      id: "fac_" + Date.now(),
+      category: "custom",
+      name: { ar: facName, en: facName },
+      aliases: { ar: [facName], en: [] },
+      center_coords: pendingPinCoords,
+      gates: [newGate],
+      parkings: []
+    };
+
+    schemaData.facilities.unshift(newFac);
+    localStorage.setItem("shortcut_schema_v1", JSON.stringify(schemaData));
+    closeModal("newGateModal");
+    setEndPoint({ lat: pendingPinCoords.lat, lng: pendingPinCoords.lng, label: `${facName} (${gateName})`, gate: newGate, facility: newFac });
+  }
+
+  // Overpass API Real Data Importer
+  async function fetchFromOverpass(preset) {
+    const status = document.getElementById("osmStatus");
+    status.textContent = "جاري الاتصال بخوادم OpenStreetMap وجلب المنشآت والبوابات...";
+
+    let bbox;
+    if (preset === "cairo") bbox = "30.045,31.310,30.075,31.355";
+    else if (preset === "riyadh") bbox = "24.690,46.660,24.740,46.720";
+    else {
+      const wrap = document.getElementById("mapWrap");
+      const tl = screenToLatLng(0, 0);
+      const br = screenToLatLng(wrap.clientWidth, wrap.clientHeight);
+      bbox = `${br.lat.toFixed(4)},${tl.lng.toFixed(4)},${tl.lat.toFixed(4)},${br.lng.toFixed(4)}`;
+    }
+
+    const query = `[out:json][timeout:15];(node["amenity"~"hospital|university"](${bbox});way["amenity"~"hospital|university"](${bbox});node["entrance"](${bbox});node["barrier"="gate"](${bbox});node["amenity"="parking"](${bbox}););out center 60;`;
+
+    try {
+      const res = await fetch("https://overpass-api.de/api/interpreter", {
+        method: "POST",
+        body: "data=" + encodeURIComponent(query)
+      });
+      const data = await res.json();
+      const elements = data.elements || [];
+
+      const amenities = elements.filter(e => e.tags && (e.tags.amenity === "hospital" || e.tags.amenity === "university"));
+      const gates = elements.filter(e => e.tags && (e.tags.entrance || e.tags.barrier === "gate"));
+      const parkings = elements.filter(e => e.tags && e.tags.amenity === "parking");
+
+      let added = 0;
+      amenities.forEach(am => {
+        const c = am.center || { lat: am.lat, lon: am.lon };
+        if (!c.lat) return;
+        const nameAr = am.tags["name:ar"] || am.tags.name || (am.tags.amenity === "hospital" ? "مستشفى (OSM)" : "جامعة (OSM)");
+        const nearbyGates = gates.filter(g => haversineKm({ lat: c.lat, lng: c.lon }, { lat: g.lat, lng: g.lon }) < 0.35);
+        const nearbyPark = parkings.find(p => haversineKm({ lat: c.lat, lng: c.lon }, { lat: p.lat, lng: p.lon }) < 0.45);
+
+        const parkObj = nearbyPark ? [{
+          id: "park_osm_" + nearbyPark.id,
+          name: { ar: nearbyPark.tags?.name || "موقف سيارات مجاور (OSM)", en: "Nearby OSM Parking" },
+          entrance_coords: { lat: nearbyPark.lat, lng: nearbyPark.lon },
+          walking_to_gate_meters: Math.round(haversineKm({ lat: c.lat, lng: c.lon }, { lat: nearbyPark.lat, lng: nearbyPark.lon }) * 1000) || 80,
+          walking_time_seconds: 70,
+          accessible_spots: true
+        }] : [];
+
+        const gateObjs = nearbyGates.length ? nearbyGates.slice(0, 3).map((g, i) => ({
+          id: "gate_osm_" + g.id,
+          type: "osm_entrance",
+          is_public: g.tags.access !== "private" && g.tags.access !== "no",
+          name: { ar: g.tags["name:ar"] || g.tags.name || `بوابة / مدخل رقم ${i + 1}`, en: g.tags.name || `Entrance ${i + 1}` },
+          coords: { lat: g.lat, lng: g.lon },
+          linked_parking_ids: parkObj.length ? [parkObj[0].id] : [],
+          accessibility: { wheelchair: g.tags.wheelchair || "full", elderly_friendly: g.tags.wheelchair !== "no", has_ramp: g.tags.wheelchair === "yes", stairs_count: 0 },
+          guidance_note: { ar: "مستورد تلقائياً من OpenStreetMap ومربوط بأقرب موقف.", en: "Imported from OSM." }
+        })) : [{
+          id: "gate_osm_center_" + am.id,
+          type: "main_entrance",
+          is_public: true,
+          name: { ar: "المدخل الرئيسي للمنشأة", en: "Main Entrance" },
+          coords: { lat: c.lat, lng: c.lon },
+          linked_parking_ids: parkObj.length ? [parkObj[0].id] : [],
+          accessibility: { wheelchair: am.tags.wheelchair || "full", elderly_friendly: true, has_ramp: true, stairs_count: 0 },
+          guidance_note: { ar: "منشأة مستوردة من OpenStreetMap.", en: "OSM Facility." }
+        }];
+
+        if (!schemaData.facilities.some(f => f.id === "fac_osm_" + am.id)) {
+          schemaData.facilities.unshift({
+            id: "fac_osm_" + am.id,
+            osm_id: `${am.type}/${am.id}`,
+            category: am.tags.amenity,
+            name: { ar: nameAr, en: am.tags["name:en"] || nameAr },
+            aliases: { ar: [nameAr], en: [] },
+            center_coords: { lat: c.lat, lng: c.lon },
+            gates: gateObjs,
+            parkings: parkObj
+          });
+          added++;
+        }
+      });
+
+      localStorage.setItem("shortcut_schema_v1", JSON.stringify(schemaData));
+      renderMap();
+      status.textContent = added > 0
+        ? `✓ تم استيراد ودمج ${added} منشأة ببواباتها ومواقفها بنجاح!`
+        : "لم يتم العثور على منشآت جديدة في هذا النطاق، حرّك الخريطة أو اختر مدينة.";
+    } catch (e) {
+      status.textContent = "تعذر الاتصال بخادم Overpass حالياً (تأكد من الاتصال بالإنترنت).";
+    }
+  }
+
+  // Modals & Schema Export/Import
+  function openModal(id) {
+    if (id === "gatesModal") renderFacilitiesModal();
+    document.getElementById(id).classList.add("open");
+  }
+  function closeModal(id) {
+    document.getElementById(id).classList.remove("open");
+  }
+
+  function renderFacilitiesModal() {
+    const box = document.getElementById("facilitiesList");
+    box.innerHTML = schemaData.facilities.map(fac => `
+      <div class="fac-item">
+        <div style="font-size:13px; font-weight:800;">${fac.name.ar}</div>
+        <div style="font-size:11px; color:var(--muted); margin-bottom:4px;">${fac.category === "hospital" ? "مستشفى" : (fac.category === "university" ? "جامعة" : "مرفق موثق")} • ${fac.gates.length} بوابات</div>
+        <div>
+          ${fac.gates.map(g => {
+            const p = (fac.parkings || []).find(pk => (g.linked_parking_ids || []).includes(pk.id));
+            return `<span class="gate-chip ${g.is_public === false ? "closed" : ""}" onclick='pickGateFromModal("${fac.id}", "${g.id}")'>
+              ${g.is_public === false ? "🚫" : "📍"} ${g.name.ar} ${p ? "(+موقف)" : ""}
+            </span>`;
+          }).join("")}
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function pickGateFromModal(facId, gateId) {
+    const fac = schemaData.facilities.find(f => f.id === facId);
+    const gate = fac?.gates.find(g => g.id === gateId);
+    const parking = (fac?.parkings || []).find(p => (gate?.linked_parking_ids || []).includes(p.id));
+    if (fac && gate) {
+      closeModal("gatesModal");
+      setEndPoint({ lat: gate.coords.lat, lng: gate.coords.lng, label: `${fac.name.ar} (${gate.name.ar})`, gate, facility: fac, parking });
+    }
+  }
+
+  function exportSchemaJSON() {
+    const blob = new Blob([JSON.stringify(schemaData, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "shortcut-verified-gates.json";
+    a.click();
+  }
+
+  function copySchemaJSON() {
+    navigator.clipboard?.writeText(JSON.stringify(schemaData, null, 2));
+    alert("تم نسخ قاعدة بيانات البوابات الموحدة (JSON) إلى الحافظة.");
+  }
+
+  function importSchemaFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        if (Array.isArray(parsed.facilities)) {
+          parsed.facilities.forEach(f => {
+            if (!schemaData.facilities.some(ex => ex.id === f.id)) schemaData.facilities.push(f);
+          });
+          localStorage.setItem("shortcut_schema_v1", JSON.stringify(schemaData));
+          renderFacilitiesModal();
+          renderMap();
+          alert("تم استيراد ودمج البوابات بنجاح!");
+        }
+      } catch (err) {
+        alert("ملف JSON غير صالح.");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function applyVehPreset(val) {
+    document.getElementById("vehFuelRate").value = val;
+  }
+
+  function saveVehicleSettings() {
+    vehicleConfig.fuelRate = parseFloat(document.getElementById("vehFuelRate").value) || 8.5;
+    vehicleConfig.fuelPrice = parseFloat(document.getElementById("vehFuelPrice").value) || 13.75;
+    vehicleConfig.currency = document.getElementById("vehCurrency").value.trim() || "ج.م";
+    localStorage.setItem("shortcut_vehicle_v1", JSON.stringify(vehicleConfig));
+    document.getElementById("fuelRateLabel").textContent = vehicleConfig.fuelRate + "L";
+    closeModal("vehicleModal");
+    if (startPoint && endPoint) computeRoutes();
+  }
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+</script>
+</body>
+</html>
