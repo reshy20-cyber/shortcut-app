@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#f8fafc" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -235,7 +235,7 @@
   <!-- Live Voice Navigation Bar -->
   <div class="nav-live" id="navLiveBar">
     <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#94a3b8;">
-      <span>التوجيه الصوتي المباشر • <strong id="navStepCounter" style="color:#34d399;">خطوة 1/1</strong></span>
+      <span>التوجيه الصوتي المباشر • <strong id="navStepCounter" style="color:#34d399;">—</strong></span>
       <button class="nav-btn" id="voiceMuteBtn" onclick="toggleVoiceMute()">🔊 الصوت مفعل</button>
     </div>
     <div class="nav-step-text" id="navStepText">اتجه نحو البوابة المحددة</div>
@@ -252,7 +252,7 @@
   <section class="section" id="resultsSection">
     <div class="empty-card">
       <div class="empty-title">اضغط على أي بوابة خضراء في الخريطة أو اختر من «البوابات»</div>
-      <div class="empty-sub">الخريطة المدمجة تعمل فوراً بدون إنترنت، وتعرض الشوارع الرئيسية، المنشآت، المواقف، والبوابات الموثقة. اسحب الخريطة للتحريك أو المس أي نقطة لرسم المسار.</div>
+      <div class="empty-sub">الخريطة المدمجة تعرض المنشآت والمواقف والبوابات المحفوظة بدون إنترنت، لكن صور الخريطة والبحث وحساب المسارات الحقيقية تحتاج اتصالًا. اسحب الخريطة للتحريك أو المس أي نقطة لرسم المسار.</div>
     </div>
   </section>
 </div>
@@ -328,6 +328,7 @@
       <button class="btn" onclick="fetchFromOverpass('cairo')">القاهرة</button>
       <button class="btn" onclick="fetchFromOverpass('riyadh')">الرياض</button>
     </div>
+    <p style="font-size:11px; color:var(--muted); margin:8px 0 0;">البيانات © مساهمو OpenStreetMap (ترخيص ODbL).</p>
     <div id="osmStatus" style="margin-top:10px; font-size:12px; font-weight:700; color:var(--primary);"></div>
   </div>
 </div>
@@ -446,8 +447,32 @@
     ]
   };
 
-  let schemaData = JSON.parse(localStorage.getItem("shortcut_schema_v1") || "null") || DEFAULT_SCHEMA;
-  let vehicleConfig = JSON.parse(localStorage.getItem("shortcut_vehicle_v1") || "null") || { fuelRate: 8.5, fuelPrice: 13.75, currency: "ج.م" };
+  function esc(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  const num = (v) => typeof v === "number" && isFinite(v);
+  // يتحقق من بنية المنشآت المستوردة حتى لا يكسر ملف خاطئ التطبيق
+  function sanitizeFacility(f) {
+    if (!f || typeof f !== "object" || !f.id || !f.name || typeof f.name.ar !== "string" || !Array.isArray(f.gates)) return null;
+    const gates = f.gates.filter(g => g && g.id && g.name && typeof g.name.ar === "string" && g.coords && num(g.coords.lat) && num(g.coords.lng));
+    if (!gates.length) return null;
+    const parkings = (Array.isArray(f.parkings) ? f.parkings : []).filter(k => k && k.id && k.name && typeof k.name.ar === "string" && k.entrance_coords && num(k.entrance_coords.lat) && num(k.entrance_coords.lng));
+    return Object.assign({}, f, { gates, parkings });
+  }
+  function loadSavedSchema() {
+    try {
+      const saved = JSON.parse(localStorage.getItem("shortcut_schema_v1") || "null");
+      if (saved && Array.isArray(saved.facilities)) {
+        const ok = saved.facilities.map(sanitizeFacility).filter(Boolean);
+        if (ok.length) return Object.assign({}, saved, { facilities: ok });
+      }
+    } catch (e) {}
+    return null;
+  }
+  function saveSchema() { try { localStorage.setItem("shortcut_schema_v1", JSON.stringify(schemaData)); } catch (e) {} }
+
+  let schemaData = loadSavedSchema() || DEFAULT_SCHEMA;
+  let vehicleConfig = (() => { try { return JSON.parse(localStorage.getItem("shortcut_vehicle_v1") || "null"); } catch (e) { return null; } })() || { fuelRate: 8.5, fuelPrice: 13.75, currency: "ج.م" };
 
   let currentMode = "car";
   let isOffline = false;
@@ -553,7 +578,7 @@
 
   function drawRoundedRect(x, y, w, h, r) {
     ctx.beginPath();
-    ctx.roundRect(x, y, w, h, r);
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h);
     ctx.fill();
   }
 
@@ -760,6 +785,17 @@
       ctx.beginPath(); ctx.arc(s.x, s.y, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
 
+    if (!isOffline) {
+      ctx.font = "9px sans-serif";
+      ctx.textAlign = "right";
+      const txt = "© OpenStreetMap contributors";
+      const tw2 = ctx.measureText(txt).width + 8;
+      ctx.fillStyle = "rgba(255,255,255,0.8)";
+      ctx.fillRect(w - tw2, h - 14, tw2, 14);
+      ctx.fillStyle = "#334155";
+      ctx.fillText(txt, w - 4, h - 4);
+    }
+
     if (liveUserCoords) {
       const s = latLngToScreen(liveUserCoords.lat, liveUserCoords.lng);
       ctx.fillStyle = "#1d4ed8";
@@ -918,7 +954,7 @@
     document.getElementById("resultsSection").innerHTML = `
       <div class="empty-card">
         <div class="empty-title">اضغط على أي بوابة خضراء في الخريطة أو اختر من «البوابات»</div>
-        <div class="empty-sub">الخريطة المدمجة تعمل فوراً بدون إنترنت، وتعرض الشوارع الرئيسية، المنشآت، المواقف، والبوابات الموثقة.</div>
+        <div class="empty-sub">البوابات المحفوظة تظهر بدون إنترنت، أما الخريطة والمسارات الحقيقية فتحتاج اتصالًا.</div>
       </div>`;
   }
 
@@ -988,8 +1024,10 @@
 
   // Search with Aliases & Nominatim
   let searchTimer = null;
+  let searchSeq = 0;
   function handleSearch(target, query) {
     clearTimeout(searchTimer);
+    const mySeq = ++searchSeq;
     const dd = document.getElementById(target + "Dropdown");
     const q = (query || "").trim().toLowerCase();
     renderLocalSuggestions(target, q);
@@ -998,10 +1036,11 @@
         try {
           const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=4&q=${encodeURIComponent(query)}`);
           const items = await res.json();
+          if (mySeq !== searchSeq || !Array.isArray(items)) return;
           items.forEach(it => {
             const div = document.createElement("div");
             div.className = "drop-item";
-            div.innerHTML = `<div><div class="drop-title">${it.display_name.split(",")[0]}</div><div class="drop-sub">${it.display_name}</div></div><span class="badge badge-osm">OSM</span>`;
+            div.innerHTML = `<div><div class="drop-title">${esc(it.display_name.split(",")[0])}</div><div class="drop-sub">${esc(it.display_name)}</div></div><span class="badge badge-osm">OSM</span>`;
             div.onclick = () => {
               dd.classList.remove("open");
               const pt = { lat: parseFloat(it.lat), lng: parseFloat(it.lon), label: it.display_name.split(",")[0] };
@@ -1012,8 +1051,9 @@
             };
             dd.appendChild(div);
           });
+          if (items.length) dd.classList.add("open");
         } catch (e) {}
-      }, 350);
+      }, 800);
     }
   }
 
@@ -1032,8 +1072,8 @@
           div.className = "drop-item";
           div.innerHTML = `
             <div>
-              <div class="drop-title">${fac.name.ar} — ${gate.name.ar}</div>
-              <div class="drop-sub">${gate.guidance_note?.ar || ""}</div>
+              <div class="drop-title">${esc(fac.name.ar)} — ${esc(gate.name.ar)}</div>
+              <div class="drop-sub">${esc(gate.guidance_note?.ar || "")}</div>
             </div>
             <span class="badge badge-gate">${gate.is_public ? "بوابة موثقة" : "مغلقة للزوار"}</span>`;
           div.onclick = () => {
@@ -1066,11 +1106,13 @@
     return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
   }
 
+  let routeSeq = 0;
   async function computeRoutes() {
     const sec = document.getElementById("resultsSection");
     sec.innerHTML = `<div class="empty-card"><div class="empty-title">جاري تحليل المسارات والبوابات...</div></div>`;
 
     const profile = currentMode === "car" ? "driving" : "foot";
+    const mySeq = ++routeSeq;
     let rawRoutes = [];
 
     if (!isOffline) {
@@ -1089,6 +1131,7 @@
       } catch (e) {}
     }
 
+    if (mySeq !== routeSeq) return;
     const baseDist = rawRoutes[0]?.distKm || Math.max(0.4, haversineKm(startPoint, endPoint) * 1.25);
     const speedKmh = currentMode === "car" ? 34 : (currentMode === "walk" ? 4.8 : 3.6);
     const baseDur = rawRoutes[0]?.durMin || Math.max(2, Math.round((baseDist / speedKmh) * 60));
@@ -1104,6 +1147,7 @@
     ];
 
     const rFast = rawRoutes[0] || { distKm: baseDist, durMin: baseDur, coords: baseCoords, steps: baseSteps };
+    const estShort = !rawRoutes[1], estCheap = !rawRoutes[2];
     const rShort = rawRoutes[1] || {
       distKm: +(baseDist * 0.88).toFixed(2),
       durMin: Math.round(baseDur * 1.12) + 2,
@@ -1150,31 +1194,31 @@
         dist: rShort.distKm.toFixed(1) + " كم",
         dur: rShort.durMin + " دقيقة",
         cost: calcCost(rShort.distKm, 1.0),
-        why: currentMode === "wheelchair"
-          ? `أقصر مسار مستوٍ بـ ${diffKm} كم ويتجنب السلالم والمنحدرات الحادة للوصول المباشر للبوابة.`
-          : `أقصر بـ ${diffKm} كم عبر شوارع داخلية مباشرة، لكنه أبطأ بـ ${diffMin} دقائق بسبب التقاطعات.`,
-        meta: currentMode === "wheelchair" ? ["بدون سلالم", "انحدار خفيف < 4%"] : [`وفر ${diffKm} كم`, "شوارع داخلية"],
+        why: estShort
+          ? "تقدير تقريبي (لا يوجد مسار بديل حقيقي من الخادم) — الأرقام تقريبية وليست مسارًا فعليًا."
+          : `أقصر بـ ${diffKm} كم عن الأسرع، وقد يكون أبطأ بسبب التقاطعات.`,
+        meta: estShort ? ["تقدير تقريبي"] : [`وفر ${diffKm} كم`],
         coords: rShort.coords,
         steps: rShort.steps
       },
       {
         id: "cheap",
-        badge: currentMode === "car" ? "أقل تكلفة" : "الأكثر أماناً وهدوءاً",
+        badge: currentMode === "car" ? "أقل تكلفة (تقدير)" : "مسار بديل",
         tagClass: "tag-cheap",
         color: "#d97706",
         dist: rCheap.distKm.toFixed(1) + " كم",
         dur: rCheap.durMin + " دقيقة",
         cost: calcCost(rCheap.distKm, 0.88),
-        why: currentMode === "car"
-          ? `يقلل استهلاك الوقود بنسبة 12% بفضل ثبات السرعة وتجنب التوقف المتكرر وبوابات الرسوم.`
-          : `يتجنب الطرق السريعة والتقاطعات المزدحمة ويمر بممرات مشاة هادئة ومضاءة.`,
-        meta: currentMode === "car" ? ["بدون رسوم طرق", "توفير وقود 12%"] : ["بعيد عن الزحام", "إضاءة ليلية"],
+        why: estCheap
+          ? "تقدير تقريبي (لا يوجد مسار بديل حقيقي من الخادم) — التكلفة والزمن تقريبيان."
+          : "مسار بديل من الخادم؛ قارن المسافة والتكلفة بنفسك.",
+        meta: estCheap ? ["تقدير تقريبي"] : ["مسار بديل"],
         coords: rCheap.coords,
         steps: rCheap.steps
       }
     ];
 
-    selectedRouteIdx = currentMode === "wheelchair" ? 1 : 0;
+    selectedRouteIdx = 0;
     renderResults();
   }
 
@@ -1207,8 +1251,9 @@
             ${isClosed ? "⚠️ تنبيه: هذه البوابة مغلقة للزوار" : (isWheelchairBad ? "⚠️ تنبيه: البوابة غير مهيأة للكراسي المتحركة" : "✓ تم ضبط الوصول الدقيق للبوابة")}
           </div>
           <div class="gate-banner-sub">
-            <strong>${g.name.ar}</strong> — ${g.guidance_note?.ar || ""}<br/>
-            ${p ? `🅿️ الموقف المرتبط: <strong>${p.name.ar}</strong> (مشياً ${p.walking_to_gate_meters} متر • ${Math.round(p.walking_time_seconds / 60)} دقيقة)` : ""}
+            <strong>${esc(g.name.ar)}</strong> — ${esc(g.guidance_note?.ar || "")}<br/>
+            ${currentMode === "wheelchair" ? "ℹ️ المسار المعروض مسار مشاة عادي ولا يراعي السلالم فعليًا؛ اعتمد على بيانات البوابة أعلاه.<br/>" : ""}
+            ${p ? `🅿️ الموقف المرتبط: <strong>${esc(p.name.ar)}</strong> (مشياً ${p.walking_to_gate_meters} متر • ${Math.round(p.walking_time_seconds / 60)} دقيقة)` : ""}
           </div>
         </div>`;
     }
@@ -1216,17 +1261,17 @@
     const cardsHtml = calculatedRoutes.map((r, idx) => `
       <div class="route-card ${idx === selectedRouteIdx ? "selected" : ""}" onclick="selectRoute(${idx})">
         <div class="route-top">
-          <span class="route-tag ${r.tagClass}">${r.badge}</span>
+          <span class="route-tag ${r.tagClass}">${esc(r.badge)}</span>
           <div class="route-metrics">
-            <span>${r.dur}</span>
+            <span>${esc(r.dur)}</span>
             <span style="color:var(--muted);">•</span>
-            <span>${r.dist}</span>
+            <span>${esc(r.dist)}</span>
             <span style="color:var(--muted);">•</span>
-            <span style="color:var(--emerald);">${r.cost}</span>
+            <span style="color:var(--emerald);">${esc(r.cost)}</span>
           </div>
         </div>
-        <div class="route-why"><strong>لماذا هذا المسار؟</strong> ${r.why}</div>
-        <div class="route-meta">${r.meta.map(m => `<span>• ${m}</span>`).join("")}</div>
+        <div class="route-why"><strong>لماذا هذا المسار؟</strong> ${esc(r.why)}</div>
+        <div class="route-meta">${r.meta.map(m => `<span>• ${esc(m)}</span>`).join("")}</div>
       </div>
     `).join("");
 
@@ -1389,7 +1434,7 @@
     };
 
     schemaData.facilities.unshift(newFac);
-    localStorage.setItem("shortcut_schema_v1", JSON.stringify(schemaData));
+    saveSchema();
     closeModal("newGateModal");
     setEndPoint({ lat: pendingPinCoords.lat, lng: pendingPinCoords.lng, label: `${facName} (${gateName})`, gate: newGate, facility: newFac });
   }
@@ -1558,7 +1603,7 @@
       }
     });
 
-    localStorage.setItem("shortcut_schema_v1", JSON.stringify(schemaData));
+    saveSchema();
     if (firstCoords) {
       mapState.centerLat = firstCoords.lat;
       mapState.centerLng = firstCoords.lng;
@@ -1584,13 +1629,13 @@
     const box = document.getElementById("facilitiesList");
     box.innerHTML = schemaData.facilities.map(fac => `
       <div class="fac-item">
-        <div style="font-size:13px; font-weight:800;">${fac.name.ar}</div>
+        <div style="font-size:13px; font-weight:800;">${esc(fac.name.ar)}</div>
         <div style="font-size:11px; color:var(--muted); margin-bottom:4px;">${fac.category === "hospital" ? "مستشفى" : (fac.category === "university" ? "جامعة" : "مرفق موثق")} • ${fac.gates.length} بوابات</div>
         <div>
           ${fac.gates.map(g => {
             const p = (fac.parkings || []).find(pk => (g.linked_parking_ids || []).includes(pk.id));
-            return `<span class="gate-chip ${g.is_public === false ? "closed" : ""}" onclick='pickGateFromModal("${fac.id}", "${g.id}")'>
-              ${g.is_public === false ? "🚫" : "📍"} ${g.name.ar} ${p ? "(+موقف)" : ""}
+            return `<span class="gate-chip ${g.is_public === false ? "closed" : ""}" onclick='pickGateFromModal(${JSON.stringify(fac.id).replace(/'/g, "&#39;")}, ${JSON.stringify(g.id).replace(/'/g, "&#39;")})'>
+              ${g.is_public === false ? "🚫" : "📍"} ${esc(g.name.ar)} ${p ? "(+موقف)" : ""}
             </span>`;
           }).join("")}
         </div>
@@ -1629,10 +1674,12 @@
       try {
         const parsed = JSON.parse(reader.result);
         if (Array.isArray(parsed.facilities)) {
-          parsed.facilities.forEach(f => {
-            if (!schemaData.facilities.some(ex => ex.id === f.id)) schemaData.facilities.push(f);
+          let added = 0;
+          parsed.facilities.map(sanitizeFacility).filter(Boolean).forEach(f => {
+            if (!schemaData.facilities.some(ex => ex.id === f.id)) { schemaData.facilities.push(f); added++; }
           });
-          localStorage.setItem("shortcut_schema_v1", JSON.stringify(schemaData));
+          if (!added) { alert("لم تُضف أي منشأة: الملف لا يحتوي منشآت جديدة بصيغة صحيحة."); return; }
+          saveSchema();
           renderFacilitiesModal();
           renderMap();
           alert("تم استيراد ودمج البوابات بنجاح!");
@@ -1652,7 +1699,7 @@
     vehicleConfig.fuelRate = parseFloat(document.getElementById("vehFuelRate").value) || 8.5;
     vehicleConfig.fuelPrice = parseFloat(document.getElementById("vehFuelPrice").value) || 13.75;
     vehicleConfig.currency = document.getElementById("vehCurrency").value.trim() || "ج.م";
-    localStorage.setItem("shortcut_vehicle_v1", JSON.stringify(vehicleConfig));
+    try { localStorage.setItem("shortcut_vehicle_v1", JSON.stringify(vehicleConfig)); } catch (e) {}
     document.getElementById("fuelRateLabel").textContent = vehicleConfig.fuelRate + "L";
     closeModal("vehicleModal");
     if (startPoint && endPoint) computeRoutes();
