@@ -331,6 +331,7 @@
   </div>
 </div>
 
+<script src="config.js"></script>
 <script>
   // 1. Unified Global JSON Schema v1.0.0
   const DEFAULT_SCHEMA = {
@@ -782,7 +783,7 @@
     if (!isOffline) {
       ctx.font = "9px sans-serif";
       ctx.textAlign = "right";
-      const txt = "© OpenStreetMap contributors";
+      const txt = GEO_KEY ? "© OpenStreetMap contributors • Powered by Geoapify" : "© OpenStreetMap contributors";
       const tw2 = ctx.measureText(txt).width + 8;
       ctx.fillStyle = "rgba(255,255,255,0.8)";
       ctx.fillRect(w - tw2, h - 14, tw2, 14);
@@ -1110,12 +1111,67 @@
   }
 
   let routeSeq = 0;
+  // ---- مسارات حقيقية من Geoapify: balanced = الأسرع، short = الأقصر ----
+  const GEO_KEY = (window.SHORTCUT_CONFIG && window.SHORTCUT_CONFIG.geoapifyKey || "").trim();
+  async function geoapifyRoute(type, mode) {
+    const wp = `${startPoint.lat},${startPoint.lng}|${endPoint.lat},${endPoint.lng}`;
+    const build = (lang) => `https://api.geoapify.com/v1/routing?waypoints=${encodeURIComponent(wp)}&mode=${mode}&type=${type}&details=instruction_details&lang=${lang}&apiKey=${encodeURIComponent(GEO_KEY)}`;
+    let res = await fetch(build("ar"));
+    if (res.status === 400) res = await fetch(build("en"));
+    if (!res.ok) { const err = new Error("geo " + res.status); err.status = res.status; throw err; }
+    const data = await res.json();
+    const f = data.features && data.features[0];
+    if (!f || !f.geometry) throw new Error("geo empty");
+    const lines = f.geometry.type === "MultiLineString" ? f.geometry.coordinates : [f.geometry.coordinates];
+    const coords = [].concat(...lines).map(c => [c[1], c[0]]);
+    const steps = [];
+    (f.properties.legs || []).forEach(leg => (leg.steps || []).forEach(st => {
+      const t = st.instruction && st.instruction.text;
+      if (t) steps.push(st.distance ? `${t} (${Math.round(st.distance)} م)` : t);
+    }));
+    return { distKm: f.properties.distance / 1000, durMin: Math.max(1, Math.round(f.properties.time / 60)), coords, steps };
+  }
+
+  async function computeRoutesGeoapify(mySeq) {
+    const mode = currentMode === "car" ? "drive" : "walk";
+    const [fast, short] = await Promise.all([geoapifyRoute("balanced", mode), geoapifyRoute("short", mode)]);
+    if (mySeq !== routeSeq) return true;
+    const money = (km) => currentMode !== "car" ? "0 " + vehicleConfig.currency : ((km / 100) * vehicleConfig.fuelRate * vehicleConfig.fuelPrice).toFixed(1) + " " + vehicleConfig.currency;
+    const steps = (r, a, b) => r.steps.length ? r.steps : [`انطلق من ${a}`, `اتبع المسار على الخريطة`, `وصلت إلى ${b}`];
+    const sameRoute = Math.abs(fast.distKm - short.distKm) < 0.05;
+    const mk = (r, id, badge, tagClass, color, why, meta) => ({
+      id, badge, tagClass, color, dist: r.distKm.toFixed(1) + " كم", dur: r.durMin + " دقيقة",
+      cost: money(r.distKm), why, meta, coords: r.coords, steps: steps(r, startPoint.label, endPoint.label)
+    });
+    const kmDiff = (fast.distKm - short.distKm).toFixed(1);
+    const minDiff = short.durMin - fast.durMin;
+    if (sameRoute) {
+      calculatedRoutes = [mk(fast, "fast", "الأسرع والأقصر", "tag-short", "#059669", "المساران متطابقان تقريباً: هذا هو الأقصر وهو أيضاً الأسرع.", ["مسار حقيقي"])];
+    } else {
+      calculatedRoutes = [
+        mk(fast, "fast", "أسرع وصول", "tag-fast", "#2563eb", `أسرع بـ ${Math.max(0, minDiff)} دقيقة تقريباً، وأطول بـ ${kmDiff} كم من الأقصر.`, ["مسار حقيقي"]),
+        mk(short, "short", "أقصر مسافة", "tag-short", "#059669", `أقصر بـ ${kmDiff} كم، وأبطأ بـ ${Math.max(0, minDiff)} دقيقة تقريباً.`, ["مسار حقيقي"])
+      ];
+    }
+    selectedRouteIdx = 0;
+    renderResults();
+    return true;
+  }
+
   async function computeRoutes() {
     const sec = document.getElementById("resultsSection");
     sec.innerHTML = `<div class="empty-card"><div class="empty-title">جاري تحليل المسارات والبوابات...</div></div>`;
 
     const profile = currentMode === "car" ? "driving" : "foot";
     const mySeq = ++routeSeq;
+    window.lastRouteError = null;
+    if (GEO_KEY && !isOffline) {
+      try {
+        if (await computeRoutesGeoapify(mySeq)) return;
+      } catch (e) {
+        window.lastRouteError = e && e.status ? ("رفض الخادم الطلب (" + e.status + ")") : "تعذر الاتصال بخدمة المسارات";
+      }
+    }
     let rawRoutes = [];
 
     if (!isOffline) {
@@ -1286,6 +1342,11 @@
       </div>
       ${cardsHtml}
     `;
+    if (calculatedRoutes[0] && (calculatedRoutes[0].meta || []).includes("مسار حقيقي")) {
+      sec.insertAdjacentHTML("beforeend", `<div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">المسارات: Powered by Geoapify • بيانات © مساهمو OpenStreetMap</div>`);
+    } else if (window.lastRouteError) {
+      sec.insertAdjacentHTML("afterbegin", `<div class="gate-banner warn"><div class="gate-banner-title">⚠️ ${esc(window.lastRouteError)}</div><div class="gate-banner-sub">المعروض تقدير تقريبي بدل المسار الحقيقي.</div></div>`);
+    }
     document.getElementById("sheetActions").innerHTML = `<button class="start-nav-btn" onclick="startNavigation()">ابدأ التوجيه الصوتي</button>`;
 
     const active = calculatedRoutes[selectedRouteIdx];
