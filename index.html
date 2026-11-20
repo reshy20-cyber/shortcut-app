@@ -1044,8 +1044,16 @@
     if (!isOffline && q.length >= 3) {
       searchTimer = setTimeout(async () => {
         try {
-          const res = await fetchT(`https://nominatim.openstreetmap.org/search?format=json&limit=4&accept-language=ar&q=${encodeURIComponent(query)}`, 10000);
-          const items = await res.json();
+          // تحيّز النتائج نحو المنطقة الحالية (نقطة الانطلاق أو مركز الخريطة) بدل البحث في العالم كله
+          const c = startPoint || { lat: mapState.centerLat, lng: mapState.centerLng };
+          const d = 0.6;
+          const vb = `${c.lng - d},${c.lat + d},${c.lng + d},${c.lat - d}`;
+          const res = await fetchT(`https://nominatim.openstreetmap.org/search?format=json&limit=10&accept-language=ar&viewbox=${vb}&bounded=0&q=${encodeURIComponent(query)}`, 10000);
+          let items = await res.json();
+          if (Array.isArray(items)) {
+            items.sort((a, b) => haversineKm(c, { lat: +a.lat, lng: +a.lon }) - haversineKm(c, { lat: +b.lat, lng: +b.lon }));
+            items = items.slice(0, 5);
+          }
           if (mySeq !== searchSeq || !Array.isArray(items)) return;
           items.forEach(it => {
             const div = document.createElement("div");
