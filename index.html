@@ -1039,7 +1039,7 @@
     if (!isOffline && q.length >= 3) {
       searchTimer = setTimeout(async () => {
         try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=4&q=${encodeURIComponent(query)}`);
+          const res = await fetchT(`https://nominatim.openstreetmap.org/search?format=json&limit=4&accept-language=ar&q=${encodeURIComponent(query)}`, 10000);
           const items = await res.json();
           if (mySeq !== searchSeq || !Array.isArray(items)) return;
           items.forEach(it => {
@@ -1103,6 +1103,13 @@
   });
 
   // Routing & Explainable Engine
+  // fetch مع مهلة حتى لا تبقى الشاشة معلّقة عند ضعف الإنترنت
+  function fetchT(url, ms) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), ms || 12000);
+    return fetch(url, { signal: ctl.signal }).finally(() => clearTimeout(t));
+  }
+
   function haversineKm(a, b) {
     const R = 6371;
     const dLat = (b.lat - a.lat) * Math.PI / 180;
@@ -1117,8 +1124,8 @@
   async function geoapifyRoute(type, mode) {
     const wp = `${startPoint.lat},${startPoint.lng}|${endPoint.lat},${endPoint.lng}`;
     const build = (lang) => `https://api.geoapify.com/v1/routing?waypoints=${encodeURIComponent(wp)}&mode=${mode}&type=${type}&details=instruction_details&lang=${lang}&apiKey=${encodeURIComponent(GEO_KEY)}`;
-    let res = await fetch(build("ar"));
-    if (res.status === 400) res = await fetch(build("en"));
+    let res = await fetchT(build("ar"), 15000);
+    if (res.status === 400) res = await fetchT(build("en"), 15000);
     if (!res.ok) { const err = new Error("geo " + res.status); err.status = res.status; throw err; }
     const data = await res.json();
     const f = data.features && data.features[0];
@@ -1178,10 +1185,10 @@
     if (!isOffline) {
       try {
         const url = `https://router.project-osrm.org/route/v1/${profile}/${startPoint.lng},${startPoint.lat};${endPoint.lng},${endPoint.lat}?overview=full&geometries=geojson&alternatives=true&steps=true`;
-        const res = await fetch(url);
+        const res = await fetchT(url, 15000);
         const data = await res.json();
         if (data.routes && data.routes.length) {
-          rawRoutes = data.routes.map(r => ({
+          rawRoutes = data.routes.slice(0, 3).map(r => ({
             distKm: r.distance / 1000,
             durMin: Math.max(1, Math.round(r.duration / 60)),
             coords: r.geometry.coordinates.map(c => [c[1], c[0]]),
@@ -1192,92 +1199,49 @@
     }
 
     if (mySeq !== routeSeq) return;
-    const baseDist = rawRoutes[0]?.distKm || Math.max(0.4, haversineKm(startPoint, endPoint) * 1.25);
-    const speedKmh = currentMode === "car" ? 34 : (currentMode === "walk" ? 4.8 : 3.6);
-    const baseDur = rawRoutes[0]?.durMin || Math.max(2, Math.round((baseDist / speedKmh) * 60));
 
-    // Orthogonal street-aligned fallback geometry
-    const mid1 = [startPoint.lat, endPoint.lng];
-    const mid2 = [endPoint.lat, startPoint.lng];
-    const baseCoords = rawRoutes[0]?.coords || [[startPoint.lat, startPoint.lng], mid1, [endPoint.lat, endPoint.lng]];
-    const baseSteps = rawRoutes[0]?.steps?.length ? rawRoutes[0].steps : [
-      `انطلق من ${startPoint.label}`,
-      `استمر عبر الشارع الرئيسي لمسافة ${(baseDist * 0.6).toFixed(1)} كم`,
-      `انعطف مباشرة نحو ${endPoint.label} — وصلت إلى البوابة`
-    ];
-
-    const rFast = rawRoutes[0] || { distKm: baseDist, durMin: baseDur, coords: baseCoords, steps: baseSteps };
-    const estShort = !rawRoutes[1], estCheap = !rawRoutes[2];
-    const rShort = rawRoutes[1] || {
-      distKm: +(baseDist * 0.88).toFixed(2),
-      durMin: Math.round(baseDur * 1.12) + 2,
-      coords: [[startPoint.lat, startPoint.lng], [(startPoint.lat + endPoint.lat) / 2, (startPoint.lng + endPoint.lng) / 2], [endPoint.lat, endPoint.lng]],
-      steps: baseSteps
-    };
-    const rCheap = rawRoutes[2] || {
-      distKm: +(baseDist * 0.95).toFixed(2),
-      durMin: Math.round(baseDur * 1.06) + 1,
-      coords: [[startPoint.lat, startPoint.lng], mid2, [endPoint.lat, endPoint.lng]],
-      steps: baseSteps
-    };
+    // لا نختلق مسارات: إن لم يصل مسار حقيقي نعرض رسالة واضحة مع زر إعادة المحاولة
+    if (!rawRoutes.length) {
+      calculatedRoutes = [];
+      const reason = isOffline ? "أنت في وضع دون إنترنت، والمسارات الحقيقية تحتاج اتصالًا."
+        : (window.lastRouteError || "تعذر الوصول إلى خدمة المسارات الآن.");
+      const air = haversineKm(startPoint, endPoint).toFixed(1);
+      document.getElementById("resultsSection").innerHTML = `
+        <div class="gate-banner warn">
+          <div class="gate-banner-title">⚠️ تعذر حساب المسار</div>
+          <div class="gate-banner-sub">${esc(reason)}<br/>المسافة المباشرة بين النقطتين حوالي ${air} كم (خط مستقيم وليست مسارًا).</div>
+        </div>`;
+      document.getElementById("sheetActions").innerHTML = `<button class="start-nav-btn" onclick="computeRoutes()">إعادة المحاولة</button>`;
+      setSheetSummary("تعذر حساب المسار", "اضغط إعادة المحاولة");
+      toggleSheet(true);
+      renderMap();
+      return;
+    }
 
     const calcCost = (km, factor) => {
       if (currentMode !== "car") return "0 " + vehicleConfig.currency;
       const liters = (km / 100) * vehicleConfig.fuelRate * factor;
       return (liters * vehicleConfig.fuelPrice).toFixed(1) + " " + vehicleConfig.currency;
     };
-
-    const diffKm = Math.max(0.2, (rFast.distKm - rShort.distKm)).toFixed(1);
-    const diffMin = Math.max(2, (rShort.durMin - rFast.durMin));
-
-    calculatedRoutes = [
-      {
-        id: "fast",
-        badge: "أسرع وصول",
-        tagClass: "tag-fast",
-        color: "#2563eb",
-        dist: rFast.distKm.toFixed(1) + " كم",
-        dur: rFast.durMin + " دقيقة",
-        cost: calcCost(rFast.distKm, 1.05),
-        why: currentMode === "car"
-          ? `يوفر ${diffMin} دقائق عبر محاور رئيسية بانسيابية مرورية أعلى، رغم أنه أطول بـ ${diffKm} كم.`
-          : `أسرع مسار مباشر للمشاة عبر أرصفة واضحة ومعابر نظامية.`,
-        meta: currentMode === "car" ? ["انسيابية مرورية عالية", "إشارات أقل"] : ["رصيف ممهد", "عبور آمن"],
-        coords: rFast.coords,
-        steps: rFast.steps
-      },
-      {
-        id: "short",
-        badge: "أقصر مسافة",
-        tagClass: "tag-short",
-        color: "#059669",
-        dist: rShort.distKm.toFixed(1) + " كم",
-        dur: rShort.durMin + " دقيقة",
-        cost: calcCost(rShort.distKm, 1.0),
-        why: estShort
-          ? "تقدير تقريبي (لا يوجد مسار بديل حقيقي من الخادم) — الأرقام تقريبية وليست مسارًا فعليًا."
-          : `أقصر بـ ${diffKm} كم عن الأسرع، وقد يكون أبطأ بسبب التقاطعات.`,
-        meta: estShort ? ["تقدير تقريبي"] : [`وفر ${diffKm} كم`],
-        coords: rShort.coords,
-        steps: rShort.steps
-      },
-      {
-        id: "cheap",
-        badge: currentMode === "car" ? "أقل تكلفة (تقدير)" : "مسار بديل",
-        tagClass: "tag-cheap",
-        color: "#d97706",
-        dist: rCheap.distKm.toFixed(1) + " كم",
-        dur: rCheap.durMin + " دقيقة",
-        cost: calcCost(rCheap.distKm, 0.88),
-        why: estCheap
-          ? "تقدير تقريبي (لا يوجد مسار بديل حقيقي من الخادم) — التكلفة والزمن تقريبيان."
-          : "مسار بديل من الخادم؛ قارن المسافة والتكلفة بنفسك.",
-        meta: estCheap ? ["تقدير تقريبي"] : ["مسار بديل"],
-        coords: rCheap.coords,
-        steps: rCheap.steps
-      }
-    ];
-
+    const baseSteps = (r) => r.steps.length ? r.steps : [`انطلق من ${startPoint.label}`, "اتبع المسار على الخريطة", `وصلت إلى ${endPoint.label}`];
+    const fastest = rawRoutes.reduce((m, r) => r.durMin < m.durMin ? r : m, rawRoutes[0]);
+    const shortest = rawRoutes.reduce((m, r) => r.distKm < m.distKm ? r : m, rawRoutes[0]);
+    const mkR = (r, i) => {
+      const isFast = r === fastest, isShort = r === shortest;
+      const badge = isFast && isShort ? "الأسرع والأقصر" : isFast ? "أسرع وصول" : isShort ? "أقصر مسافة" : "مسار بديل";
+      const cls = isFast && !isShort ? "tag-fast" : isShort ? "tag-short" : "tag-cheap";
+      const color = isFast && !isShort ? "#2563eb" : isShort ? "#059669" : "#d97706";
+      return {
+        id: "r" + i, badge, tagClass: cls, color,
+        dist: r.distKm.toFixed(1) + " كم", dur: r.durMin + " دقيقة", cost: calcCost(r.distKm, 1),
+        why: isFast && isShort ? "هذا المسار هو الأقصر وهو أيضًا الأسرع."
+          : isFast ? `الأسرع بين الخيارات (${r.durMin} دقيقة).`
+          : isShort ? `الأقصر بين الخيارات (${r.distKm.toFixed(1)} كم).`
+          : "مسار بديل من الخادم؛ قارن المسافة والزمن بنفسك.",
+        meta: ["مسار حقيقي"], coords: r.coords, steps: baseSteps(r)
+      };
+    };
+    calculatedRoutes = rawRoutes.map(mkR);
     selectedRouteIdx = 0;
     renderResults();
   }
@@ -1338,7 +1302,7 @@
     sec.innerHTML = `
       ${gateHtml}
       <div class="section-head">
-        <span class="section-title">المقارنة الذكية (3 خيارات مفسّرة)</span>
+        <span class="section-title">${calculatedRoutes.length > 1 ? 'المقارنة بين ' + calculatedRoutes.length + ' مسارات' : 'المسار'}</span>
         <span style="font-size:11px; color:var(--muted);">${isOffline ? "وضع دون إنترنت" : "خريطة تفاعلية مدمجة"}</span>
       </div>
       ${cardsHtml}
@@ -1346,9 +1310,9 @@
     if (calculatedRoutes[0] && (calculatedRoutes[0].meta || []).includes("مسار حقيقي")) {
       sec.insertAdjacentHTML("beforeend", `<div style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px;">المسارات: Powered by Geoapify • بيانات © مساهمو OpenStreetMap</div>`);
     } else if (window.lastRouteError) {
-      sec.insertAdjacentHTML("afterbegin", `<div class="gate-banner warn"><div class="gate-banner-title">⚠️ ${esc(window.lastRouteError)}</div><div class="gate-banner-sub">المعروض تقدير تقريبي بدل المسار الحقيقي.</div></div>`);
+      sec.insertAdjacentHTML("afterbegin", `<div class="gate-banner warn"><div class="gate-banner-title">⚠️ ${esc(window.lastRouteError)}</div><div class="gate-banner-sub">المسار الحالي من خدمة احتياطية.</div></div>`);
     }
-    document.getElementById("sheetActions").innerHTML = `<button class="start-nav-btn" onclick="startNavigation()">ابدأ التوجيه الصوتي</button><button class="more-btn" onclick="toggleSheet()">⇅ عرض / إخفاء تفاصيل المسارات</button>`;
+    document.getElementById("sheetActions").innerHTML = `<button class="start-nav-btn" onclick="startNavigation()">ابدأ التوجيه الصوتي</button><button class="more-btn" onclick="shareRoute()">↗ مشاركة</button><button class="more-btn" onclick="toggleSheet()">⇅ التفاصيل</button>`;
 
     const active = calculatedRoutes[selectedRouteIdx];
     const hasWarn = !!document.querySelector("#resultsSection .gate-banner.warn");
@@ -1356,6 +1320,30 @@
     toggleSheet(!hasWarn);
     if (active) fitMapToBounds(active.coords);
     else renderMap();
+  }
+
+  // مشاركة المسار كرابط يفتح نفس الوجهة عند المستلم
+  function shareRoute() {
+    if (!startPoint || !endPoint) return;
+    const f = (p) => p.lat.toFixed(5) + "," + p.lng.toFixed(5);
+    const u = location.origin + location.pathname + "?from=" + f(startPoint) + "&to=" + f(endPoint) + "&mode=" + currentMode
+      + "&tl=" + encodeURIComponent(endPoint.label || "");
+    if (navigator.share) navigator.share({ title: "أقصر طريق", text: "المسار إلى " + (endPoint.label || "الوجهة"), url: u }).catch(() => {});
+    else if (navigator.clipboard) navigator.clipboard.writeText(u).then(() => alert("تم نسخ رابط المسار"), () => prompt("انسخ الرابط:", u));
+    else prompt("انسخ الرابط:", u);
+  }
+
+  function loadSharedRoute() {
+    const q = new URLSearchParams(location.search);
+    const ll = (v) => { const m = /^(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)$/.exec(v || ""); return m ? { lat: +m[1], lng: +m[2] } : null; };
+    const a = ll(q.get("from")), b = ll(q.get("to"));
+    if (!a || !b || Math.abs(a.lat) > 90 || Math.abs(b.lat) > 90 || Math.abs(a.lng) > 180 || Math.abs(b.lng) > 180) return;
+    const md = q.get("mode");
+    if (["car", "walk", "wheelchair"].includes(md)) setMode(md);
+    startPoint = Object.assign(a, { label: "نقطة الانطلاق" });
+    document.getElementById("startInput").value = startPoint.label;
+    mapState.centerLat = b.lat; mapState.centerLng = b.lng;
+    setEndPoint(Object.assign(b, { label: (q.get("tl") || "الوجهة").slice(0, 80) }));
   }
 
   function selectRoute(idx) {
@@ -1773,6 +1761,8 @@
     closeModal("vehicleModal");
     if (startPoint && endPoint) computeRoutes();
   }
+
+  try { loadSharedRoute(); } catch (e) {}
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
