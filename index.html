@@ -928,6 +928,7 @@
 
   function setEndPoint(pt) {
     endPoint = pt;
+    addRecent(pt);
     document.getElementById("endInput").value = pt.label;
     updateHint();
     renderMap();
@@ -1075,10 +1076,65 @@
     }
   }
 
+  // ---- الأماكن المحفوظة (البيت/العمل) والوجهات الأخيرة: تُخزَّن على الجهاز فقط ----
+  function loadLS(k, d) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
+  function saveLS(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function cleanPt(p) {
+    if (!p || typeof p.lat !== "number" || typeof p.lng !== "number" || !isFinite(p.lat) || !isFinite(p.lng)) return null;
+    return { lat: p.lat, lng: p.lng, label: String(p.label || "مكان").slice(0, 80) };
+  }
+  function getSaved() { const o = loadLS("shortcut_saved_v1", {}); return { home: cleanPt(o.home), work: cleanPt(o.work) }; }
+  function getRecents() { const a = loadLS("shortcut_recent_v1", []); return Array.isArray(a) ? a.map(cleanPt).filter(Boolean) : []; }
+  function addRecent(pt) {
+    const c = cleanPt(pt); if (!c || pt.gate) return;
+    const list = getRecents().filter(r => Math.abs(r.lat - c.lat) > 0.0003 || Math.abs(r.lng - c.lng) > 0.0003);
+    list.unshift(c);
+    saveLS("shortcut_recent_v1", list.slice(0, 8));
+  }
+  function saveEndAs(kind) {
+    const c = cleanPt(endPoint); if (!c) return;
+    const o = getSaved(); o[kind] = c; saveLS("shortcut_saved_v1", o);
+    alert("تم حفظ «" + c.label + "» كـ" + (kind === "home" ? "البيت" : "العمل"));
+    renderResults();
+  }
+  function clearRecents() { saveLS("shortcut_recent_v1", []); document.querySelectorAll(".dropdown").forEach(d => d.classList.remove("open")); }
+
+  function renderPersonalSuggestions(target, q, dd) {
+    const items = [];
+    const sv = getSaved();
+    [["home", "🏠", "البيت"], ["work", "💼", "العمل"]].forEach(([k, ic, nm]) => {
+      if (sv[k] && (!q || (nm + " " + sv[k].label).toLowerCase().includes(q))) items.push({ pt: sv[k], title: ic + " " + nm, sub: sv[k].label, badge: "محفوظ" });
+    });
+    getRecents().forEach(r => {
+      if (!q || r.label.toLowerCase().includes(q)) items.push({ pt: r, title: "🕘 " + r.label, sub: "وجهة سابقة", badge: "أخيرة" });
+    });
+    items.slice(0, q ? 4 : 8).forEach(it => {
+      const div = document.createElement("div");
+      div.className = "drop-item";
+      div.innerHTML = `<div><div class="drop-title">${esc(it.title)}</div><div class="drop-sub">${esc(it.sub)}</div></div><span class="badge badge-osm">${it.badge}</span>`;
+      div.onclick = () => {
+        dd.classList.remove("open");
+        const pt = { lat: it.pt.lat, lng: it.pt.lng, label: it.pt.label };
+        target === "start" ? setStartPoint(pt) : setEndPoint(pt);
+        mapState.centerLat = pt.lat; mapState.centerLng = pt.lng;
+        renderMap();
+      };
+      dd.appendChild(div);
+    });
+    if (!q && items.some(i => i.badge === "أخيرة")) {
+      const c = document.createElement("div");
+      c.className = "drop-item"; c.style.justifyContent = "center";
+      c.innerHTML = `<span class="drop-sub" style="color:var(--danger)">مسح الوجهات الأخيرة</span>`;
+      c.onclick = (e) => { e.stopPropagation(); clearRecents(); };
+      dd.appendChild(c);
+    }
+    return items.length;
+  }
+
   function renderLocalSuggestions(target, q) {
     const dd = document.getElementById(target + "Dropdown");
     dd.innerHTML = "";
-    let count = 0;
+    let count = renderPersonalSuggestions(target, q, dd);
     schemaData.facilities.forEach(fac => {
       const allNames = [fac.name.ar, fac.name.en, ...(fac.aliases?.ar || []), ...(fac.aliases?.en || [])].join(" ").toLowerCase();
       fac.gates.forEach(gate => {
@@ -1312,8 +1368,12 @@
       </div>
     `).join("");
 
+    const saveRow = (endPoint && !endPoint.gate) ? `<div style="display:flex;gap:8px;margin:0 0 10px;">
+        <button class="mini-action" style="flex:1" onclick="saveEndAs('home')">🏠 احفظ كبيت</button>
+        <button class="mini-action" style="flex:1" onclick="saveEndAs('work')">💼 احفظ كعمل</button></div>` : "";
     sec.innerHTML = `
       ${gateHtml}
+      ${saveRow}
       <div class="section-head">
         <span class="section-title">${calculatedRoutes.length > 1 ? 'المقارنة بين ' + calculatedRoutes.length + ' مسارات' : 'المسار'}</span>
         <span style="font-size:11px; color:var(--muted);">${isOffline ? "وضع دون إنترنت" : "خريطة تفاعلية مدمجة"}</span>
