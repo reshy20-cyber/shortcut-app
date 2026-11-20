@@ -35,7 +35,8 @@
     .input-row { display: flex; align-items: center; gap: 8px; background: var(--surface-soft); border: 1px solid var(--border); border-radius: 14px; padding: 4px 10px; min-height: 46px; position: relative; }
     .input-row + .input-row { margin-top: 7px; }
     .input-row:focus-within { border-color: var(--primary); background: #fff; }
-    .input-row.main { min-height: 52px; }
+    .input-row.main { min-height: 50px; }
+    .input-row { min-height: 42px; }
     .input-row.main input { font-size: 16px; font-weight: 700; }
     .dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
     .dot.start { background: var(--primary); box-shadow: 0 0 0 3px #dbeafe; }
@@ -44,10 +45,10 @@
     .mini-action { background: #fff; color: var(--primary); border: 1px solid #dbeafe; border-radius: 11px; min-height: 36px; padding: 0 11px; font-size: 13px; font-weight: 700; white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
     .mini-action.green { color: var(--emerald); border-color: #a7f3d0; background: var(--emerald-soft); }
     .menu-btn { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--border); background: #fff; font-size: 20px; cursor: pointer; flex-shrink: 0; }
-    .mode-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
-    .mode-tab { border: 1px solid var(--border); background: var(--surface-soft); color: var(--muted); border-radius: 12px; min-height: 42px; padding: 0 6px; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; }
+    .mode-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; }
+    .mode-tab { border: 1px solid var(--border); background: var(--surface-soft); color: var(--muted); border-radius: 12px; min-height: 38px; padding: 0 6px; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; }
     .mode-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 3px 10px rgba(37,99,235,0.22); }
-    .hint-chip { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: fit-content; max-width: 100%; margin: 8px auto 0; background: rgba(255,255,255,0.96); border: 1px solid var(--border); border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 12.5px; font-weight: 700; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+    .hint-chip { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: fit-content; max-width: 100%; margin: 6px auto 0; background: rgba(255,255,255,0.96); border: 1px solid var(--border); border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 12.5px; font-weight: 700; box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
     .hint-chip .mini-action { min-height: 28px; padding: 0 10px; font-size: 12px; }
 
     /* القوائم المنسدلة */
@@ -77,6 +78,10 @@
     .sheet-actions { padding: 0 12px 10px; flex-shrink: 0; }
     .more-btn { display:block; width:100%; margin-top:8px; padding:12px; border:1.5px solid #cbd5e1; background:#f8fafc; color:#334155; border-radius:14px; font-size:14px; font-weight:800; font-family:inherit; cursor:pointer; }
     .sheet-actions:empty { display: none; }
+    .sheet-actions { display: flex; gap: 8px; align-items: stretch; }
+    .sheet-actions .start-nav-btn { flex: 1; margin-top: 0; min-height: 52px; }
+    .sheet-actions .more-btn { width: auto; min-width: 56px; margin-top: 0; padding: 0 14px; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; line-height: 1; }
+    .sheet-actions .more-btn small { font-size: 10.5px; font-weight: 800; }
 
     .nav-live { margin: 0 0 10px; background: #0f172a; color: #fff; border-radius: var(--radius); padding: 12px; display: none; }
     .nav-live.active { display: block; }
@@ -1039,8 +1044,16 @@
     if (!isOffline && q.length >= 3) {
       searchTimer = setTimeout(async () => {
         try {
-          const res = await fetchT(`https://nominatim.openstreetmap.org/search?format=json&limit=4&accept-language=ar&q=${encodeURIComponent(query)}`, 10000);
-          const items = await res.json();
+          // تحيّز النتائج نحو المنطقة الحالية (نقطة الانطلاق أو مركز الخريطة) بدل البحث في العالم كله
+          const c = startPoint || { lat: mapState.centerLat, lng: mapState.centerLng };
+          const d = 0.6;
+          const vb = `${c.lng - d},${c.lat + d},${c.lng + d},${c.lat - d}`;
+          const res = await fetchT(`https://nominatim.openstreetmap.org/search?format=json&limit=10&accept-language=ar&viewbox=${vb}&bounded=0&q=${encodeURIComponent(query)}`, 10000);
+          let items = await res.json();
+          if (Array.isArray(items)) {
+            items.sort((a, b) => haversineKm(c, { lat: +a.lat, lng: +a.lon }) - haversineKm(c, { lat: +b.lat, lng: +b.lon }));
+            items = items.slice(0, 5);
+          }
           if (mySeq !== searchSeq || !Array.isArray(items)) return;
           items.forEach(it => {
             const div = document.createElement("div");
@@ -1312,7 +1325,7 @@
     } else if (window.lastRouteError) {
       sec.insertAdjacentHTML("afterbegin", `<div class="gate-banner warn"><div class="gate-banner-title">⚠️ ${esc(window.lastRouteError)}</div><div class="gate-banner-sub">المسار الحالي من خدمة احتياطية.</div></div>`);
     }
-    document.getElementById("sheetActions").innerHTML = `<button class="start-nav-btn" onclick="startNavigation()">ابدأ التوجيه الصوتي</button><button class="more-btn" onclick="shareRoute()">↗ مشاركة</button><button class="more-btn" onclick="toggleSheet()">⇅ التفاصيل</button>`;
+    document.getElementById("sheetActions").innerHTML = `<button class="start-nav-btn" onclick="startNavigation()">ابدأ التوجيه الصوتي</button><button class="more-btn" onclick="shareRoute()" aria-label="مشاركة">↗<small>مشاركة</small></button><button class="more-btn" onclick="toggleSheet()" aria-label="التفاصيل">⇅<small>التفاصيل</small></button>`;
 
     const active = calculatedRoutes[selectedRouteIdx];
     const hasWarn = !!document.querySelector("#resultsSection .gate-banner.warn");
