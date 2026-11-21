@@ -45,6 +45,10 @@
     .mini-action { background: #fff; color: var(--primary); border: 1px solid #dbeafe; border-radius: 11px; min-height: 36px; padding: 0 11px; font-size: 13px; font-weight: 700; white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
     .mini-action.green { color: var(--emerald); border-color: #a7f3d0; background: var(--emerald-soft); }
     .menu-btn { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--border); background: #fff; font-size: 20px; cursor: pointer; flex-shrink: 0; }
+    .quick-chips { display: flex; gap: 6px; margin-top: 6px; overflow-x: auto; }
+    .quick-chips:empty { display: none; }
+    .qchip { flex: 0 0 auto; border: 1px solid var(--border); background: #fff; color: var(--text); border-radius: 999px; min-height: 34px; padding: 0 12px; font-size: 13px; font-weight: 700; cursor: pointer; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .qchip.empty { color: var(--muted); border-style: dashed; font-weight: 600; }
     .mode-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; }
     .mode-tab { border: 1px solid var(--border); background: var(--surface-soft); color: var(--muted); border-radius: 12px; min-height: 38px; padding: 0 6px; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; }
     .mode-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); box-shadow: 0 3px 10px rgba(37,99,235,0.22); }
@@ -154,6 +158,7 @@
       <button class="menu-btn" onclick="openModal('menuModal')" aria-label="القائمة">☰</button>
       <div class="dropdown" id="endDropdown"></div>
     </div>
+    <div class="quick-chips" id="quickChips"></div>
     <div class="input-row">
       <span class="dot start"></span>
       <input type="text" id="startInput" placeholder="نقطة الانطلاق (أو اضغط على الخريطة)" autocomplete="off" oninput="handleSearch('start', this.value)" onfocus="handleSearch('start', this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();triggerQuickSearch('start', this.value);}" />
@@ -219,12 +224,27 @@
       <button class="close-btn" onclick="closeModal('menuModal')">✕</button>
     </div>
     <div class="menu-list">
-      <button class="menu-item" onclick="closeModal('menuModal');openModal('gatesModal')">🏛️ البوابات والمواقف الموثقة</button>
-      <button class="menu-item" id="pinGateBtn" onclick="closeModal('menuModal');togglePinGateMode()">📍 تثبيت بوابة على الخريطة</button>
-      <button class="menu-item" onclick="closeModal('menuModal');openModal('osmModal')">🌐 جلب منشآت من OpenStreetMap</button>
+      <button class="menu-item" onclick="closeModal('menuModal');openModal('savedModal')">⭐ الأماكن المحفوظة (البيت والعمل)</button>
       <button class="menu-item" id="vehiclePill" onclick="closeModal('menuModal');openModal('vehicleModal')">⛽ المركبة والوقود: <span id="fuelRateLabel">8.5L</span></button>
       <button class="menu-item online" id="netPill" onclick="toggleOfflineMode()">🌍 الإنترنت: <span id="netDot">●</span> <span id="netLabel">متصل</span> <span style="margin-right:auto;font-size:12px;font-weight:600;">اضغط للتبديل</span></button>
+      <details class="menu-adv">
+        <summary class="menu-item" style="list-style:none;">🛠️ أدوات متقدمة (للمنشآت والبوابات)</summary>
+        <button class="menu-item" onclick="closeModal('menuModal');openModal('gatesModal')">🏛️ البوابات والمواقف الموثقة</button>
+        <button class="menu-item" id="pinGateBtn" onclick="closeModal('menuModal');togglePinGateMode()">📍 تثبيت بوابة على الخريطة</button>
+        <button class="menu-item" onclick="closeModal('menuModal');openModal('osmModal')">🌐 جلب منشآت من OpenStreetMap</button>
+      </details>
     </div>
+  </div>
+</div>
+
+<!-- Saved places -->
+<div class="modal-backdrop" id="savedModal" onclick="if(event.target===this) closeModal('savedModal')">
+  <div class="modal-sheet">
+    <div class="modal-head">
+      <div class="modal-title">الأماكن المحفوظة</div>
+      <button class="close-btn" onclick="closeModal('savedModal')">✕</button>
+    </div>
+    <div id="savedBody"></div>
   </div>
 </div>
 
@@ -444,7 +464,17 @@
   function saveSchema() { try { localStorage.setItem("shortcut_schema_v1", JSON.stringify(schemaData)); } catch (e) {} }
 
   let schemaData = loadSavedSchema() || DEFAULT_SCHEMA;
-  let vehicleConfig = (() => { try { return JSON.parse(localStorage.getItem("shortcut_vehicle_v1") || "null"); } catch (e) { return null; } })() || { fuelRate: 8.5, fuelPrice: 13.75, currency: "ج.م" };
+  // قيم افتراضية تقريبية للوقود حسب بلد المستخدم (تُستنتج من المنطقة الزمنية)، ويمكن تعديلها من الإعدادات
+  function defaultVehicleConfig() {
+    let tz = ""; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) {}
+    const lang = (navigator.language || "").toUpperCase();
+    const T = [[/^Europe\/London|Belfast/, 1.45, "£"], [/^Africa\/Cairo/, 13.75, "ج.م"], [/^Asia\/Riyadh/, 2.18, "ر.س"], [/^Asia\/Dubai/, 2.7, "د.إ"],
+      [/^America\//, 0.95, "$"], [/^Europe\//, 1.75, "€"]];
+    for (const [re, price, cur] of T) if (re.test(tz)) return { fuelRate: 8.5, fuelPrice: price, currency: cur };
+    if (/-EG$/.test(lang)) return { fuelRate: 8.5, fuelPrice: 13.75, currency: "ج.م" };
+    return { fuelRate: 8.5, fuelPrice: 13.75, currency: "ج.م" };
+  }
+  let vehicleConfig = (() => { try { return JSON.parse(localStorage.getItem("shortcut_vehicle_v1") || "null"); } catch (e) { return null; } })() || defaultVehicleConfig();
 
   let currentMode = "car";
   let isOffline = false;
@@ -1094,10 +1124,59 @@
   function saveEndAs(kind) {
     const c = cleanPt(endPoint); if (!c) return;
     const o = getSaved(); o[kind] = c; saveLS("shortcut_saved_v1", o);
+    renderQuickChips();
     alert("تم حفظ «" + c.label + "» كـ" + (kind === "home" ? "البيت" : "العمل"));
     renderResults();
   }
   function clearRecents() { saveLS("shortcut_recent_v1", []); document.querySelectorAll(".dropdown").forEach(d => d.classList.remove("open")); }
+
+
+  // ---- شريط البيت/العمل السريع وإدارة الأماكن المحفوظة ----
+  const SAVED_KINDS = [["home", "🏠", "البيت"], ["work", "💼", "العمل"]];
+  function renderQuickChips() {
+    const el = document.getElementById("quickChips"); if (!el) return;
+    const sv = getSaved();
+    el.innerHTML = SAVED_KINDS.map(([k, ic, nm]) => sv[k]
+      ? `<button class="qchip" onclick="goSaved('${k}')">${ic} ${nm}</button>`
+      : `<button class="qchip empty" onclick="openSavedModal()">${ic} حدّد ${nm}</button>`).join("");
+  }
+  function goSaved(kind) {
+    const c = getSaved()[kind]; if (!c) return;
+    document.querySelectorAll(".dropdown").forEach(d => d.classList.remove("open"));
+    mapState.centerLat = c.lat; mapState.centerLng = c.lng;
+    setEndPoint({ lat: c.lat, lng: c.lng, label: c.label });
+  }
+  function openSavedModal() { renderSavedModal(); openModal("savedModal"); }
+  function renderSavedModal() {
+    const sv = getSaved();
+    document.getElementById("savedBody").innerHTML = SAVED_KINDS.map(([k, ic, nm]) => `
+      <div class="field">
+        <label>${ic} ${nm}</label>
+        <div style="font-size:14px;margin-bottom:8px;">${sv[k] ? esc(sv[k].label) : '<span style="color:var(--muted)">غير محدد</span>'}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          ${endPoint ? `<button class="mini-action" onclick="setSavedFromEnd('${k}')">من الوجهة الحالية</button>` : ""}
+          <button class="mini-action" onclick="setSavedFromGps('${k}')">من موقعي الآن</button>
+          ${sv[k] ? `<button class="mini-action" style="color:var(--danger)" onclick="clearSaved('${k}')">حذف</button>` : ""}
+        </div>
+      </div>`).join("") + `<div style="font-size:12px;color:var(--muted);margin-top:6px;">للبحث عن عنوان آخر: اكتبه في خانة الوجهة ثم اضغط «احفظ كبيت/عمل» في تفاصيل المسار.</div>`;
+  }
+  function setSaved(kind, pt) {
+    const c = cleanPt(pt); if (!c) return;
+    const o = getSaved(); o[kind] = c; saveLS("shortcut_saved_v1", o);
+    renderQuickChips(); renderSavedModal();
+  }
+  function setSavedFromEnd(kind) { if (endPoint) setSaved(kind, endPoint); }
+  function setSavedFromGps(kind) {
+    if (!navigator.geolocation) { alert("الموقع غير مدعوم في هذا المتصفح."); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => setSaved(kind, { lat: pos.coords.latitude, lng: pos.coords.longitude, label: kind === "home" ? "البيت" : "العمل" }),
+      () => alert("تعذر تحديد موقعك. فعّل إذن الموقع للمتصفح."),
+      { enableHighAccuracy: true, timeout: 15000 });
+  }
+  function clearSaved(kind) {
+    const o = getSaved(); o[kind] = null; saveLS("shortcut_saved_v1", o);
+    renderQuickChips(); renderSavedModal();
+  }
 
   function renderPersonalSuggestions(target, q, dd) {
     const items = [];
@@ -1749,6 +1828,11 @@
   // Modals & Schema Export/Import
   function openModal(id) {
     if (id === "gatesModal") renderFacilitiesModal();
+    if (id === "vehicleModal") {
+      document.getElementById("vehFuelRate").value = vehicleConfig.fuelRate;
+      document.getElementById("vehFuelPrice").value = vehicleConfig.fuelPrice;
+      document.getElementById("vehCurrency").value = vehicleConfig.currency;
+    }
     document.getElementById(id).classList.add("open");
   }
   function closeModal(id) {
@@ -1835,6 +1919,7 @@
     if (startPoint && endPoint) computeRoutes();
   }
 
+  renderQuickChips();
   try { loadSharedRoute(); } catch (e) {}
 
   if ("serviceWorker" in navigator) {
